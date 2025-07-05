@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import json
 import aiosqlite
 from datetime import datetime, timedelta
@@ -29,10 +30,32 @@ class Economy(commands.Cog):
         embed.set_thumbnail(url=target.avatar.url if target.avatar else target.default_avatar.url)
         await ctx.send(embed=embed)
     
+    @app_commands.command(name="balance", description="Zeigt das Spice-Guthaben an")
+    async def balance_slash(self, interaction: discord.Interaction, member: discord.Member = None):
+        """Slash command version of balance"""
+        target = member or interaction.user
+        balance = await self.db.get_user_balance(target.id)
+        
+        embed = discord.Embed(
+            title="💰 Spice Guthaben",
+            description=f"**{target.display_name}** hat **{balance:,}** Spice",
+            color=0xD4AF37
+        )
+        embed.set_thumbnail(url=target.avatar.url if target.avatar else target.default_avatar.url)
+        await interaction.response.send_message(embed=embed)
+    
     @commands.command(name='daily', aliases=['täglich'])
     async def daily(self, ctx):
         """Holt den täglichen Spice-Bonus"""
-        user_id = ctx.author.id
+        await self._process_daily(ctx.author.id, ctx.send)
+    
+    @app_commands.command(name="daily", description="Holt den täglichen Spice-Bonus")
+    async def daily_slash(self, interaction: discord.Interaction):
+        """Slash command version of daily"""
+        await self._process_daily(interaction.user.id, interaction.response.send_message)
+    
+    async def _process_daily(self, user_id, send_func):
+        """Process daily bonus for both command and slash command"""
         daily_amount = self.config['economy']['daily_bonus']
         
         # Check if user already claimed daily today
@@ -57,7 +80,7 @@ class Economy(commands.Cog):
                                   f"Nächster Bonus in: **{hours}h {minutes}m**",
                         color=0xFF6B6B
                     )
-                    await ctx.send(embed=embed)
+                    await send_func(embed=embed)
                     return
             
             # Give daily bonus
@@ -77,7 +100,7 @@ class Economy(commands.Cog):
             color=0x4CAF50
         )
         embed.set_footer(text="Die Spice muss fließen...")
-        await ctx.send(embed=embed)
+        await send_func(embed=embed)
     
     @commands.command(name='give', aliases=['geben'])
     @has_role_permission(['admin', 'moderator'])

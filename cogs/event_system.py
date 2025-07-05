@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import json
 from datetime import datetime, timedelta
 from database import Database
@@ -26,6 +27,36 @@ class EventSystem(commands.Cog):
     @has_role_permission(['admin', 'moderator'])
     async def create_event(self, ctx, *, description):
         """Erstellt ein neues Event mit Anmeldungssystem"""
+        await self._create_event_process(description, ctx.author, ctx.send, ctx.channel.id)
+    
+    @app_commands.command(name="event", description="Erstellt ein neues Event mit Anmeldungssystem")
+    @app_commands.describe(description="Beschreibung des Events")
+    async def create_event_slash(self, interaction: discord.Interaction, description: str):
+        """Slash command version of create_event"""
+        # Check permissions
+        user_role_ids = [role.id for role in interaction.user.roles]
+        has_permission = False
+        
+        for role_name in ['admin', 'moderator']:
+            role_id = self.config['roles'].get(role_name)
+            if role_id and role_id in user_role_ids:
+                has_permission = True
+                break
+        
+        if not has_permission and interaction.user.id != interaction.guild.owner_id:
+            embed = discord.Embed(
+                title="❌ Keine Berechtigung",
+                description="Du benötigst Moderator- oder Admin-Rechte!",
+                color=0xFF6B6B
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        await interaction.response.defer()
+        await self._create_event_process(description, interaction.user, interaction.followup.send, interaction.channel.id)
+    
+    async def _create_event_process(self, description, author, send_func, channel_id):
+        """Process event creation for both command and slash command"""
         # Generate unique event ID
         event_id = f"event_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
@@ -53,7 +84,7 @@ class EventSystem(commands.Cog):
         
         embed.add_field(
             name="👤 Erstellt von",
-            value=ctx.author.mention,
+            value=author.mention,
             inline=True
         )
         
@@ -63,9 +94,9 @@ class EventSystem(commands.Cog):
             inline=False
         )
         
-        embed.set_footer(text=f"Event-ID: {event_id} | Verwende !event_info <ID> für Details")
+        embed.set_footer(text=f"Event-ID: {event_id} | Verwende /event_info <ID> für Details")
         
-        message = await ctx.send(embed=embed)
+        message = await send_func(embed=embed)
         
         # Add reaction buttons
         reactions = ['🗡️', '🛡️', '⛏️', '📦']
@@ -73,9 +104,9 @@ class EventSystem(commands.Cog):
             await message.add_reaction(reaction)
         
         # Store event info in database
-        await self.store_event(event_id, ctx.author.id, description, message.id, ctx.channel.id)
+        await self.store_event(event_id, author.id, description, message.id, channel_id)
         
-        await ctx.send(f"✅ Event erstellt! ID: `{event_id}`")
+        await send_func(f"✅ Event erstellt! ID: `{event_id}`")
     
     @commands.command(name='event_info', aliases=['eventinfo'])
     async def event_info(self, ctx, event_id: str):

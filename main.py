@@ -29,6 +29,7 @@ async def on_ready():
     
     # Load all cogs
     cogs_to_load = [
+        'cogs.command_overview',
         'cogs.economy',
         'cogs.voice_management', 
         'cogs.raid_system',
@@ -44,6 +45,13 @@ async def on_ready():
             print(f'✓ {cog} erfolgreich geladen')
         except Exception as e:
             print(f'✗ Fehler beim Laden von {cog}: {e}')
+    
+    # Sync slash commands
+    try:
+        synced = await bot.tree.sync()
+        print(f'✓ {len(synced)} Slash Commands synchronisiert')
+    except Exception as e:
+        print(f'✗ Fehler beim Synchronisieren der Slash Commands: {e}')
 
 @bot.event
 async def on_command_error(ctx, error):
