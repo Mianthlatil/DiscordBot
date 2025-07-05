@@ -346,41 +346,46 @@ class RolePromotion(commands.Cog):
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
         """Track voice activity for promotion system"""
-        now = datetime.now()
-        
-        # User joined a voice channel
-        if after.channel and not before.channel:
-            await self.db.update_voice_activity(member.id, session_start=now.isoformat())
+        try:
+            now = datetime.now()
             
-            # Award voice reward
-            voice_reward = self.config['economy']['voice_reward_per_hour'] // 12  # Per 5 minutes
-            await self.db.update_user_balance(member.id, voice_reward)
+            # User joined a voice channel
+            if after.channel and not before.channel:
+                await self.db.update_voice_activity(member.id, session_start=now.isoformat())
+                
+                # Award voice reward if economy config exists
+                if 'economy' in self.config and 'voice_reward_per_hour' in self.config['economy']:
+                    voice_reward = self.config['economy']['voice_reward_per_hour'] // 12  # Per 5 minutes
+                    await self.db.update_user_balance(member.id, voice_reward)
         
         # User left voice completely
-        elif before.channel and not after.channel:
-            voice_data = await self.db.get_voice_activity(member.id)
-            
-            if voice_data['session_start']:
-                session_start = datetime.fromisoformat(voice_data['session_start'])
-                session_duration = now - session_start
-                session_minutes = int(session_duration.total_seconds() / 60)
+            elif before.channel and not after.channel:
+                voice_data = await self.db.get_voice_activity(member.id)
                 
-                # Update total minutes and clear session
-                await self.db.update_voice_activity(member.id, minutes_to_add=session_minutes)
+                if voice_data['session_start']:
+                    session_start = datetime.fromisoformat(voice_data['session_start'])
+                    session_duration = now - session_start
+                    session_minutes = int(session_duration.total_seconds() / 60)
+                    
+                    # Update total minutes and clear session
+                    await self.db.update_voice_activity(member.id, minutes_to_add=session_minutes)
+            
+            # User switched channels (update session start time)
+            elif before.channel and after.channel and before.channel != after.channel:
+                # Calculate time in previous channel
+                voice_data = await self.db.get_voice_activity(member.id)
+                
+                if voice_data['session_start']:
+                    session_start = datetime.fromisoformat(voice_data['session_start'])
+                    session_duration = now - session_start
+                    session_minutes = int(session_duration.total_seconds() / 60)
+                    
+                    # Update minutes and start new session
+                    await self.db.update_voice_activity(member.id, minutes_to_add=session_minutes)
+                    await self.db.update_voice_activity(member.id, session_start=now.isoformat())
         
-        # User switched channels (update session start time)
-        elif before.channel and after.channel and before.channel != after.channel:
-            # Calculate time in previous channel
-            voice_data = await self.db.get_voice_activity(member.id)
-            
-            if voice_data['session_start']:
-                session_start = datetime.fromisoformat(voice_data['session_start'])
-                session_duration = now - session_start
-                session_minutes = int(session_duration.total_seconds() / 60)
-                
-                # Update minutes and start new session
-                await self.db.update_voice_activity(member.id, minutes_to_add=session_minutes)
-                await self.db.update_voice_activity(member.id, session_start=now.isoformat())
+        except Exception as e:
+            print(f"❌ Error in on_voice_state_update: {e}")
 
 async def setup(bot):
     await bot.add_cog(RolePromotion(bot))
