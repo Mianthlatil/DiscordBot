@@ -1,0 +1,70 @@
+
+{% extends "base.html" %}
+
+{% block title %}Voice Promotion - Bot Konfiguration{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4"><i class="fas fa-microphone"></i> Voice Promotion Einstellungen</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-award"></i> Automatische Beförderung</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="hours_required" class="form-label">Benötigte Stunden</label>
+                        <input type="number" class="form-control" id="hours_required" name="hours_required" 
+                               value="{{ config.voice_promotion.hours_required if config.voice_promotion else 24 }}" 
+                               min="1" max="168">
+                        <div class="form-text">Stunden in Voice Kanälen für Beförderung von Rekrut zu Member</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="check_interval" class="form-label">Check Intervall (Sekunden)</label>
+                        <input type="number" class="form-control" id="check_interval" name="check_interval" 
+                               value="{{ config.voice_promotion.check_interval if config.voice_promotion else 300 }}" 
+                               min="60" max="3600">
+                        <div class="form-text">Wie oft der Bot nach Beförderungen sucht (empfohlen: 300)</div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Speichern
+                        </button>
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Zurück
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-info-circle"></i> Hinweise</h6>
+            </div>
+            <div class="card-body">
+                <h6>Empfohlene Werte:</h6>
+                <ul class="small">
+                    <li><strong>Stunden:</strong> 24-48 Stunden</li>
+                    <li><strong>Intervall:</strong> 300 Sekunden (5 Min)</li>
+                </ul>
+                
+                <h6 class="mt-3">Funktionsweise:</h6>
+                <p class="small">
+                    Der Bot prüft automatisch alle X Sekunden, ob Rekruts genug Zeit in Voice Kanälen verbracht haben.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,111 @@
+
+{% extends "base.html" %}
+
+{% block title %}Berechtigungen - Bot Konfiguration{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4"><i class="fas fa-shield-alt"></i> Command Berechtigungen</h1>
+        <p class="text-muted">Konfiguriere welche Rollen welche Befehle verwenden können.</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Alle Commands</h5>
+                <form method="POST" action="{{ url_for('reset_permissions') }}" class="d-inline">
+                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Alle Berechtigungen zurücksetzen?')">
+                        <i class="fas fa-undo"></i> Alle zurücksetzen
+                    </button>
+                </form>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for command in all_commands %}
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card border">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <i class="fas fa-terminal"></i> {{ command }}
+                                </h6>
+                                <form class="permission-form" data-command="{{ command }}">
+                                    <div class="mb-2">
+                                        <small class="text-muted">Berechtigte Rollen:</small>
+                                    </div>
+                                    {% set current_roles = command_permissions.get(command, ['admin']) %}
+                                    {% for role in ['admin', 'moderator', 'raid_leader', 'member', 'rekrut'] %}
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" name="roles" value="{{ role }}" 
+                                               id="{{ command }}_{{ role }}" 
+                                               {% if role in current_roles %}checked{% endif %}>
+                                        <label class="form-check-label" for="{{ command }}_{{ role }}">
+                                            {% if role == 'admin' %}👑{% elif role == 'moderator' %}🛡️{% elif role == 'raid_leader' %}⚔️{% elif role == 'member' %}🥈{% else %}🥉{% endif %}
+                                            {{ role.title() }}
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                    <div class="mt-2">
+                                        <button type="submit" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-save"></i> Speichern
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const forms = document.querySelectorAll('.permission-form');
+    
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const command = this.dataset.command;
+            const formData = new FormData(this);
+            formData.append('command', command);
+            
+            fetch('{{ url_for("update_permission") }}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Zeige Erfolg an
+                    const button = this.querySelector('button[type="submit"]');
+                    const originalText = button.innerHTML;
+                    button.innerHTML = '<i class="fas fa-check"></i> Gespeichert';
+                    button.classList.remove('btn-primary');
+                    button.classList.add('btn-success');
+                    
+                    setTimeout(() => {
+                        button.innerHTML = originalText;
+                        button.classList.remove('btn-success');
+                        button.classList.add('btn-primary');
+                    }, 2000);
+                } else {
+                    alert('Fehler: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Ein Fehler ist aufgetreten');
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

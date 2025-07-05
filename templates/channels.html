@@ -1,0 +1,77 @@
+
+{% extends "base.html" %}
+
+{% block title %}Kanäle - Bot Konfiguration{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4"><i class="fas fa-hashtag"></i> Kanal Konfiguration</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-list"></i> Discord Kanäle zuweisen</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="channel_modmail_category" class="form-label">📬 ModMail Kategorie</label>
+                        <input type="text" class="form-control" id="channel_modmail_category" name="channel_modmail_category" 
+                               value="{{ config.channels.modmail_category if config.channels else '' }}" 
+                               placeholder="1234567890123456789">
+                        <div class="form-text">Kategorie für ModMail Tickets</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="channel_temp_voice_category" class="form-label">🔊 Temp Voice Kategorie</label>
+                        <input type="text" class="form-control" id="channel_temp_voice_category" name="channel_temp_voice_category" 
+                               value="{{ config.channels.temp_voice_category if config.channels else '' }}" 
+                               placeholder="1234567890123456789">
+                        <div class="form-text">Kategorie für temporäre Voice Kanäle</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="channel_raid_announcements" class="form-label">⚔️ Raid Ankündigungen</label>
+                        <input type="text" class="form-control" id="channel_raid_announcements" name="channel_raid_announcements" 
+                               value="{{ config.channels.raid_announcements if config.channels else '' }}" 
+                               placeholder="1234567890123456789">
+                        <div class="form-text">Kanal für Raid-Ankündigungen</div>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Speichern
+                        </button>
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Zurück
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-info-circle"></i> Hilfe</h6>
+            </div>
+            <div class="card-body">
+                <h6>Kanal-ID finden:</h6>
+                <ol class="small">
+                    <li>Aktiviere den Entwicklermodus</li>
+                    <li>Rechtsklick auf den Kanal</li>
+                    <li>Wähle "ID kopieren"</li>
+                </ol>
+                
+                <h6 class="mt-3">Kategorien:</h6>
+                <p class="small">Kategorien sind spezielle Kanäle die andere Kanäle gruppieren.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

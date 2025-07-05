@@ -1,0 +1,87 @@
+
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Bot Konfiguration{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4"><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Status Cards -->
+    <div class="col-md-6 col-lg-3 mb-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-cog fa-2x text-primary mb-3"></i>
+                <h5>Grundeinstellungen</h5>
+                <p class="text-muted">Prefix: <strong>{{ config.prefix or 'Nicht gesetzt' }}</strong></p>
+                <a href="{{ url_for('basic_settings') }}" class="btn btn-primary btn-sm">Bearbeiten</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-3 mb-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-users fa-2x text-success mb-3"></i>
+                <h5>Rollen</h5>
+                <p class="text-muted">{{ config.roles|length if config.roles else 0 }} konfiguriert</p>
+                <a href="{{ url_for('roles') }}" class="btn btn-success btn-sm">Bearbeiten</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-3 mb-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-hashtag fa-2x text-info mb-3"></i>
+                <h5>Kanäle</h5>
+                <p class="text-muted">{{ config.channels|length if config.channels else 0 }} konfiguriert</p>
+                <a href="{{ url_for('channels') }}" class="btn btn-info btn-sm">Bearbeiten</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-3 mb-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="fas fa-shield-alt fa-2x text-warning mb-3"></i>
+                <h5>Berechtigungen</h5>
+                <p class="text-muted">{{ config.command_permissions|length if config.command_permissions else 0 }} Commands</p>
+                <a href="{{ url_for('permissions') }}" class="btn btn-warning btn-sm">Bearbeiten</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-microphone"></i> Voice Promotion</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Stunden benötigt:</strong> {{ config.voice_promotion.hours_required if config.voice_promotion else 24 }}</p>
+                <p><strong>Check Intervall:</strong> {{ config.voice_promotion.check_interval if config.voice_promotion else 300 }}s</p>
+                <a href="{{ url_for('voice_promotion') }}" class="btn btn-primary btn-sm">Bearbeiten</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-volume-up"></i> Temp Voice</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Standard Name:</strong> {{ config.temp_voice.default_name if config.temp_voice else "{user}'s Channel" }}</p>
+                <p><strong>Standard Limit:</strong> {{ config.temp_voice.default_limit if config.temp_voice else 100 }}</p>
+                <a href="{{ url_for('temp_voice') }}" class="btn btn-primary btn-sm">Bearbeiten</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
