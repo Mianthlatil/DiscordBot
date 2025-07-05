@@ -1,17 +1,17 @@
 {
     "prefix": "!",
-    "guild_id": null,
+    "guild_id": 1354772544078479420,
     "roles": {
         "rekrut": 1354852901285007540,
         "member": 1354852864534777886,
         "moderator": 1354852701493657742,
         "admin": 1354852701493657742,
-        "raid_leader": null
+        "raid_leader": 1354852701493657742
     },
     "channels": {
         "modmail_category": 1391155257895161899,
         "temp_voice_category": 1354772544078479424,
-        "raid_announcements": null
+        "raid_announcements": 1381991973371510814
     },
     "voice_promotion": {
         "hours_required": 24,
