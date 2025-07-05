@@ -31,21 +31,21 @@ class CommandOverview(commands.Cog):
             timestamp=discord.utils.utcnow()
         )
         
-        # Economy Commands
+        # Economy Commands (daily removed)
         embed.add_field(
             name="💰 Economy System",
             value="`/balance` - Spice-Guthaben anzeigen\n"
-                  "`/daily` - Täglichen Spice-Bonus abholen\n"
                   "`/leaderboard` - Reichste Spieler anzeigen\n"
                   "`/give` - Spice vergeben (Mods)\n"
                   "`/take` - Spice entziehen (Mods)",
             inline=False
         )
         
-        # Event System
+        # Event System (updated with event-edit)
         embed.add_field(
             name="⚔️ Event System",
-            value="`/event` - Neues Event erstellen (Mods)\n"
+            value="`/event` - Neues Event mit Titel erstellen (Mods)\n"
+                  "`/event-edit` - Crawler/Carrier zuweisen (Mods)\n"
                   "`/event_info` - Event-Anmeldungen anzeigen\n"
                   "`/crawler` - Spieler als Crawler anmelden (Mods)\n"
                   "`/carrier` - Spieler als Carrier anmelden (Mods)\n"

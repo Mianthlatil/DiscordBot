@@ -44,63 +44,9 @@ class Economy(commands.Cog):
         embed.set_thumbnail(url=target.avatar.url if target.avatar else target.default_avatar.url)
         await interaction.response.send_message(embed=embed)
     
-    @commands.command(name='daily', aliases=['täglich'])
-    async def daily(self, ctx):
-        """Holt den täglichen Spice-Bonus"""
-        await self._process_daily(ctx.author.id, ctx.send)
+
     
-    @app_commands.command(name="daily", description="Holt den täglichen Spice-Bonus")
-    async def daily_slash(self, interaction: discord.Interaction):
-        """Slash command version of daily"""
-        await self._process_daily(interaction.user.id, interaction.response.send_message)
-    
-    async def _process_daily(self, user_id, send_func):
-        """Process daily bonus for both command and slash command"""
-        daily_amount = self.config['economy']['daily_bonus']
-        
-        # Check if user already claimed daily today
-        async with aiosqlite.connect(self.db.db_path) as db:
-            cursor = await db.execute(
-                "SELECT last_daily FROM economy WHERE user_id = ?", (user_id,)
-            )
-            result = await cursor.fetchone()
-            
-            now = datetime.now()
-            if result and result[0]:
-                last_daily = datetime.fromisoformat(result[0])
-                if now.date() == last_daily.date():
-                    next_daily = (last_daily + timedelta(days=1)).replace(hour=0, minute=0, second=0)
-                    time_left = next_daily - now
-                    hours, remainder = divmod(int(time_left.total_seconds()), 3600)
-                    minutes = remainder // 60
-                    
-                    embed = discord.Embed(
-                        title="⏰ Bereits abgeholt!",
-                        description=f"Du hast heute bereits deinen täglichen Bonus abgeholt!\n"
-                                  f"Nächster Bonus in: **{hours}h {minutes}m**",
-                        color=0xFF6B6B
-                    )
-                    await send_func(embed=embed)
-                    return
-            
-            # Give daily bonus
-            await db.execute('''
-                INSERT OR REPLACE INTO economy (user_id, balance, last_daily, total_earned)
-                VALUES (?, 
-                    COALESCE((SELECT balance FROM economy WHERE user_id = ?), 0) + ?,
-                    ?, 
-                    COALESCE((SELECT total_earned FROM economy WHERE user_id = ?), 0) + ?)
-            ''', (user_id, user_id, daily_amount, now.isoformat(), user_id, daily_amount))
-            await db.commit()
-        
-        embed = discord.Embed(
-            title="🎁 Täglicher Bonus!",
-            description=f"Du hast **{daily_amount:,}** Spice erhalten!\n"
-                       f"Komm morgen wieder für mehr Spice!",
-            color=0x4CAF50
-        )
-        embed.set_footer(text="Die Spice muss fließen...")
-        await send_func(embed=embed)
+
     
     @commands.command(name='give', aliases=['geben'])
     @has_role_permission(['admin', 'moderator'])

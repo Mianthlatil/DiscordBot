@@ -25,16 +25,16 @@ class EventSystem(commands.Cog):
     
     @commands.command(name='event', aliases=['create_event'])
     @has_role_permission(['admin', 'moderator'])
-    async def create_event(self, ctx, *, description):
+    async def create_event(self, ctx, title, *, description):
         """Erstellt ein neues Event mit Anmeldungssystem"""
-        await self._create_event_process(description, ctx.author, ctx.send, ctx.channel.id)
+        await self._create_event_process(title, description, ctx.author, ctx.send, ctx.channel.id)
     
     @app_commands.command(name="event", description="Erstellt ein neues Event mit Anmeldungssystem")
-    @app_commands.describe(description="Beschreibung des Events")
-    async def create_event_slash(self, interaction: discord.Interaction, description: str):
+    @app_commands.describe(title="Titel des Events", description="Beschreibung des Events")
+    async def create_event_slash(self, interaction: discord.Interaction, title: str, description: str):
         """Slash command version of create_event"""
         # Check permissions
-        user_role_ids = [role.id for role in interaction.user.roles]
+        user_role_ids = [role.id for role in interaction.user.roles] if hasattr(interaction.user, 'roles') else []
         has_permission = False
         
         for role_name in ['admin', 'moderator']:
@@ -43,7 +43,7 @@ class EventSystem(commands.Cog):
                 has_permission = True
                 break
         
-        if not has_permission and interaction.user.id != interaction.guild.owner_id:
+        if not has_permission and hasattr(interaction, 'guild') and hasattr(interaction.guild, 'owner_id') and interaction.user.id != interaction.guild.owner_id:
             embed = discord.Embed(
                 title="❌ Keine Berechtigung",
                 description="Du benötigst Moderator- oder Admin-Rechte!",
@@ -53,31 +53,28 @@ class EventSystem(commands.Cog):
             return
         
         await interaction.response.defer()
-        await self._create_event_process(description, interaction.user, interaction.followup.send, interaction.channel.id)
+        await self._create_event_process(title, description, interaction.user, interaction.followup.send, interaction.channel.id)
     
-    async def _create_event_process(self, description, author, send_func, channel_id):
+    async def _create_event_process(self, title, description, author, send_func, channel_id):
         """Process event creation for both command and slash command"""
         # Generate unique event ID
         event_id = f"event_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
         embed = discord.Embed(
-            title="⚔️ Dune Awakening Event",
+            title=f"⚔️ {title}",
             description=description,
             color=0xFF8C00,
             timestamp=datetime.now()
         )
         
         embed.add_field(
-            name="📝 Anmeldung per Reaktion",
-            value="🗡️ - **Attack** (Angreifer)\n"
-                  "🛡️ - **Def** (Verteidiger)\n"
-                  "⛏️ - **Crawler** (nur Moderatoren)\n"
-                  "📦 - **Carrier** (nur Moderatoren)",
+            name="🗡️ Attack & 🛡️ Def",
+            value="Anmeldung per Reaktion",
             inline=False
         )
         
         embed.add_field(
-            name="ℹ️ Event-ID",
+            name="Event ID",
             value=f"`{event_id}`",
             inline=True
         )
@@ -98,13 +95,13 @@ class EventSystem(commands.Cog):
         
         message = await send_func(embed=embed)
         
-        # Add reaction buttons
-        reactions = ['🗡️', '🛡️', '⛏️', '📦']
+        # Add reaction buttons (only Attack and Def)
+        reactions = ['🗡️', '🛡️']
         for reaction in reactions:
             await message.add_reaction(reaction)
         
         # Store event info in database
-        await self.store_event(event_id, author.id, description, message.id, channel_id)
+        await self.store_event(event_id, author.id, title, description, message.id, channel_id)
         
         await send_func(f"✅ Event erstellt! ID: `{event_id}`")
     
@@ -207,6 +204,65 @@ class EventSystem(commands.Cog):
         await ctx.send(embed=embed)
         await self.update_event_message(event_id)
     
+    @app_commands.command(name="event-edit", description="Fügt Crawler oder Carrier zu einem Event hinzu")
+    @app_commands.describe(
+        event_id="Event ID",
+        member="Spieler",
+        role="Rolle (crawler oder carrier)"
+    )
+    async def event_edit_slash(self, interaction: discord.Interaction, event_id: str, member: discord.Member, role: str):
+        """Slash command version of event editing"""
+        # Check permissions
+        user_role_ids = [role.id for role in interaction.user.roles] if hasattr(interaction.user, 'roles') else []
+        has_permission = False
+        
+        for role_name in ['admin', 'moderator']:
+            role_id = self.config['roles'].get(role_name)
+            if role_id and role_id in user_role_ids:
+                has_permission = True
+                break
+        
+        if not has_permission and hasattr(interaction, 'guild') and hasattr(interaction.guild, 'owner_id') and interaction.user.id != interaction.guild.owner_id:
+            embed = discord.Embed(
+                title="❌ Keine Berechtigung",
+                description="Du benötigst Moderator- oder Admin-Rechte!",
+                color=0xFF6B6B
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        role_lower = role.lower()
+        if role_lower not in ['crawler', 'carrier']:
+            embed = discord.Embed(
+                title="❌ Ungültige Rolle",
+                description="Rolle muss 'crawler' oder 'carrier' sein!",
+                color=0xFF6B6B
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        
+        role_capitalized = role_lower.capitalize()
+        emoji = '⛏️' if role_lower == 'crawler' else '📦'
+        
+        success = await self.register_for_event(event_id, member.id, member.display_name, role_capitalized)
+        
+        if success:
+            embed = discord.Embed(
+                title=f"{emoji} Als {role_capitalized} angemeldet",
+                description=f"**{member.display_name}** wurde als **{role_capitalized}** für Event `{event_id}` angemeldet!",
+                color=0x4CAF50
+            )
+            embed.set_footer(text=f"Angemeldet von {interaction.user.display_name}")
+            await self.update_event_message(event_id)
+        else:
+            embed = discord.Embed(
+                title="❌ Bereits angemeldet",
+                description=f"**{member.display_name}** ist bereits für Event `{event_id}` angemeldet!",
+                color=0xFF6B6B
+            )
+        
+        await interaction.response.send_message(embed=embed)
+    
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
         """Handle event registration reactions"""
@@ -225,31 +281,19 @@ class EventSystem(commands.Cog):
         if str(reaction.emoji) in self.event_roles:
             role = self.event_roles[str(reaction.emoji)]
             
-            # Check if user is moderator for special roles
+            # Block Crawler and Carrier reactions (only available via commands)
             if role in ['Crawler', 'Carrier']:
-                user_role_ids = [role.id for role in user.roles]
-                mod_roles = ['admin', 'moderator']
-                has_permission = False
-                
-                for mod_role in mod_roles:
-                    role_id = self.config['roles'].get(mod_role)
-                    if role_id and role_id in user_role_ids:
-                        has_permission = True
-                        break
-                
-                if not has_permission and user.id != message.guild.owner_id:
-                    # Remove reaction and send error
-                    await reaction.remove(user)
-                    try:
-                        embed = discord.Embed(
-                            title="❌ Keine Berechtigung",
-                            description=f"Nur Moderatoren können sich als **{role}** anmelden!",
-                            color=0xFF6B6B
-                        )
-                        await user.send(embed=embed)
-                    except discord.Forbidden:
-                        pass
-                    return
+                await reaction.remove(user)
+                try:
+                    embed = discord.Embed(
+                        title="❌ Nicht verfügbar",
+                        description=f"**{role}** ist nur per `/event-edit` Command verfügbar!",
+                        color=0xFF6B6B
+                    )
+                    await user.send(embed=embed)
+                except discord.Forbidden:
+                    pass
+                return
             
             # Register user for event
             success = await self.register_for_event(event_id, user.id, user.display_name, role)
@@ -280,7 +324,7 @@ class EventSystem(commands.Cog):
                 except discord.Forbidden:
                     pass
     
-    async def store_event(self, event_id, creator_id, description, message_id, channel_id):
+    async def store_event(self, event_id, creator_id, title, description, message_id, channel_id):
         """Store event information in database"""
         import aiosqlite
         async with aiosqlite.connect(self.db.db_path) as db:
@@ -288,6 +332,7 @@ class EventSystem(commands.Cog):
                 CREATE TABLE IF NOT EXISTS events (
                     event_id TEXT PRIMARY KEY,
                     creator_id INTEGER,
+                    title TEXT,
                     description TEXT,
                     message_id INTEGER,
                     channel_id INTEGER,
@@ -296,9 +341,9 @@ class EventSystem(commands.Cog):
             ''')
             
             await db.execute('''
-                INSERT INTO events (event_id, creator_id, description, message_id, channel_id)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (event_id, creator_id, description, message_id, channel_id))
+                INSERT INTO events (event_id, creator_id, title, description, message_id, channel_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (event_id, creator_id, title, description, message_id, channel_id))
             await db.commit()
     
     async def register_for_event(self, event_id, user_id, username, role):
