@@ -17,13 +17,8 @@
         "hours_required": 24,
         "check_interval": 300
     },
-    "economy": {
-        "daily_bonus": 100,
-        "voice_reward_per_hour": 25,
-        "raid_completion_bonus": 500
-    },
     "temp_voice": {
-        "default_name": "Spice Harvester {user}",
-        "default_limit": 10
+        "default_name": "{user}"'s Channel,
+        "default_limit": 100
     }
 }
