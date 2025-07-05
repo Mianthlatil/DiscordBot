@@ -1,0 +1,29 @@
+{
+    "prefix": "!",
+    "guild_id": null,
+    "roles": {
+        "rekrut": null,
+        "member": null,
+        "moderator": null,
+        "admin": null,
+        "raid_leader": null
+    },
+    "channels": {
+        "modmail_category": null,
+        "temp_voice_category": null,
+        "raid_announcements": null
+    },
+    "voice_promotion": {
+        "hours_required": 24,
+        "check_interval": 300
+    },
+    "economy": {
+        "daily_bonus": 100,
+        "voice_reward_per_hour": 25,
+        "raid_completion_bonus": 500
+    },
+    "temp_voice": {
+        "default_name": "Spice Harvester {user}",
+        "default_limit": 10
+    }
+}
