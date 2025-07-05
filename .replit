@@ -22,3 +22,20 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pip install discord.py aiosqlite && python main.py"
+
+[[workflows.workflow]]
+name = "Bot + Web Interface"
+author = 24511928
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python run_web.py"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
