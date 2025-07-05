@@ -34,7 +34,8 @@ async def on_ready():
         'cogs.raid_system',
         'cogs.modmail',
         'cogs.temp_voice',
-        'cogs.role_promotion'
+        'cogs.role_promotion',
+        'cogs.event_system'
     ]
     
     for cog in cogs_to_load:

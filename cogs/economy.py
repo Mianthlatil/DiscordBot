@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import json
+import aiosqlite
 from datetime import datetime, timedelta
 from database import Database
 from utils.permissions import has_role_permission
