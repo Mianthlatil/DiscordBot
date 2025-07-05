@@ -1,7 +1,9 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import json
 import asyncio
+import aiosqlite
 from datetime import datetime
 from database import Database
 from utils.permissions import has_role_permission
@@ -18,11 +20,24 @@ class ModMail(commands.Cog):
     @commands.command(name='modmail', aliases=['mm'])
     async def create_modmail(self, ctx, *, message):
         """Erstellt ein neues ModMail Ticket"""
+        # ModMail can now be used in any channel
+        # Delete the original message if in a guild to keep it private
         if ctx.guild:
-            await ctx.send("❌ Dieser Befehl kann nur in privaten Nachrichten verwendet werden!")
-            return
+            try:
+                await ctx.message.delete()
+            except discord.Forbidden:
+                pass
         
         user = ctx.author
+        
+        # Get the guild - if in DM, use first guild, if in guild use that guild
+        if ctx.guild:
+            guild = ctx.guild
+        else:
+            guild = self.bot.guilds[0] if self.bot.guilds else None
+            if not guild:
+                await ctx.send("❌ Fehler: Bot ist mit keinem Server verbunden!")
+                return
         
         # Check if user already has an open modmail thread
         async with aiosqlite.connect(self.db.db_path) as db:
@@ -38,11 +53,7 @@ class ModMail(commands.Cog):
                 await ctx.send(f"❌ Du hast bereits ein offenes ModMail Ticket! <#{existing[0]}>")
                 return
         
-        # Get the guild (assuming single guild bot)
-        guild = self.bot.guilds[0] if self.bot.guilds else None
-        if not guild:
-            await ctx.send("❌ Fehler: Bot ist mit keinem Server verbunden!")
-            return
+
         
         # Get modmail category
         category_id = self.config['channels']['modmail_category']

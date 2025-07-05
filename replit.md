@@ -128,6 +128,9 @@ temp_voice_channels: channel_id, owner_id, created_at
 - July 05, 2025. Removed daily command from economy system per user request
 - July 05, 2025. Enhanced Event System with custom titles and /event-edit command
 - July 05, 2025. Restricted Crawler/Carrier roles to command-only assignment
+- July 05, 2025. Fixed database schema for event titles and improved UI
+- July 05, 2025. Enhanced ModMail system to work in any channel with privacy features
+- July 05, 2025. Added player name display in event registrations by role
 
 ## User Preferences
 

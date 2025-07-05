@@ -68,14 +68,26 @@ class EventSystem(commands.Cog):
         )
         
         embed.add_field(
-            name="🗡️ Attack & 🛡️ Def",
-            value="Anmeldung per Reaktion",
-            inline=False
+            name="🗡️ Attack (0)",
+            value="Niemand angemeldet",
+            inline=True
         )
         
         embed.add_field(
-            name="Event ID",
-            value=f"`{event_id}`",
+            name="🛡️ Def (0)",
+            value="Niemand angemeldet",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="⛏️ Crawler (0)",
+            value="Niemand angemeldet",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="📦 Carrier (0)",
+            value="Niemand angemeldet",
             inline=True
         )
         
@@ -83,12 +95,6 @@ class EventSystem(commands.Cog):
             name="👤 Erstellt von",
             value=author.mention,
             inline=True
-        )
-        
-        embed.add_field(
-            name="📊 Anmeldungen",
-            value="🗡️ Attack: 0\n🛡️ Def: 0\n⛏️ Crawler: 0\n📦 Carrier: 0",
-            inline=False
         )
         
         embed.set_footer(text=f"Event-ID: {event_id} | Verwende /event_info <ID> für Details")
@@ -204,12 +210,30 @@ class EventSystem(commands.Cog):
         await ctx.send(embed=embed)
         await self.update_event_message(event_id)
     
+    async def event_autocomplete(self, interaction: discord.Interaction, current: str):
+        """Autocomplete for event IDs with titles"""
+        import aiosqlite
+        async with aiosqlite.connect(self.db.db_path) as db:
+            cursor = await db.execute(
+                "SELECT event_id, title FROM events WHERE event_id LIKE ? OR title LIKE ? LIMIT 10",
+                (f"%{current}%", f"%{current}%")
+            )
+            results = await cursor.fetchall()
+            
+            choices = []
+            for event_id, title in results:
+                display_name = f"{title} ({event_id})" if title else event_id
+                choices.append(app_commands.Choice(name=display_name, value=event_id))
+            
+            return choices
+
     @app_commands.command(name="event-edit", description="Fügt Crawler oder Carrier zu einem Event hinzu")
     @app_commands.describe(
         event_id="Event ID",
         member="Spieler",
         role="Rolle (crawler oder carrier)"
     )
+    @app_commands.autocomplete(event_id=event_autocomplete)
     async def event_edit_slash(self, interaction: discord.Interaction, event_id: str, member: discord.Member, role: str):
         """Slash command version of event editing"""
         # Check permissions
@@ -328,11 +352,15 @@ class EventSystem(commands.Cog):
         """Store event information in database"""
         import aiosqlite
         async with aiosqlite.connect(self.db.db_path) as db:
+            # First check if table exists and add title column if missing
+            cursor = await db.execute("PRAGMA table_info(events)")
+            columns = await cursor.fetchall()
+            column_names = [col[1] for col in columns]
+            
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS events (
                     event_id TEXT PRIMARY KEY,
                     creator_id INTEGER,
-                    title TEXT,
                     description TEXT,
                     message_id INTEGER,
                     channel_id INTEGER,
@@ -340,8 +368,12 @@ class EventSystem(commands.Cog):
                 )
             ''')
             
+            # Add title column if it doesn't exist
+            if 'title' not in column_names:
+                await db.execute('ALTER TABLE events ADD COLUMN title TEXT DEFAULT ""')
+            
             await db.execute('''
-                INSERT INTO events (event_id, creator_id, title, description, message_id, channel_id)
+                INSERT OR REPLACE INTO events (event_id, creator_id, title, description, message_id, channel_id)
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (event_id, creator_id, title, description, message_id, channel_id))
             await db.commit()
@@ -391,7 +423,7 @@ class EventSystem(commands.Cog):
             import aiosqlite
             async with aiosqlite.connect(self.db.db_path) as db:
                 cursor = await db.execute(
-                    "SELECT message_id, channel_id, description FROM events WHERE event_id = ?",
+                    "SELECT message_id, channel_id, title, description, creator_id FROM events WHERE event_id = ?",
                     (event_id,)
                 )
                 result = await cursor.fetchone()
@@ -399,7 +431,7 @@ class EventSystem(commands.Cog):
             if not result:
                 return
             
-            message_id, channel_id, description = result
+            message_id, channel_id, title, description, creator_id = result
             channel = self.bot.get_channel(channel_id)
             if not channel:
                 return
@@ -412,28 +444,49 @@ class EventSystem(commands.Cog):
             # Get current registrations
             registrations = await self.get_event_registrations(event_id)
             
-            # Count by role
-            role_counts = {'Attack': 0, 'Def': 0, 'Crawler': 0, 'Carrier': 0}
+            # Group by role with player names
+            role_groups = {'Attack': [], 'Def': [], 'Crawler': [], 'Carrier': []}
             for user_id, username, role, registered_at in registrations:
-                if role in role_counts:
-                    role_counts[role] += 1
+                if role in role_groups:
+                    role_groups[role].append(username)
             
-            # Update embed
-            embed = message.embeds[0]
+            # Create new embed with updated data
+            embed = discord.Embed(
+                title=f"⚔️ {title}" if title else f"⚔️ Event {event_id}",
+                description=description,
+                color=0xFF8C00,
+                timestamp=datetime.now()
+            )
             
-            # Find and update the registration field
-            for i, field in enumerate(embed.fields):
-                if field.name == "📊 Anmeldungen":
-                    embed.set_field_at(
-                        i,
-                        name="📊 Anmeldungen",
-                        value=f"🗡️ Attack: {role_counts['Attack']}\n"
-                              f"🛡️ Def: {role_counts['Def']}\n"
-                              f"⛏️ Crawler: {role_counts['Crawler']}\n"
-                              f"📦 Carrier: {role_counts['Carrier']}",
-                        inline=False
-                    )
-                    break
+            # Add role fields with player names
+            role_emojis = {'Attack': '🗡️', 'Def': '🛡️', 'Crawler': '⛏️', 'Carrier': '📦'}
+            
+            for role, players in role_groups.items():
+                emoji = role_emojis[role]
+                count = len(players)
+                
+                if players:
+                    player_list = '\n'.join(f"• {player}" for player in players[:10])  # Limit to 10 for space
+                    if len(players) > 10:
+                        player_list += f"\n... und {len(players) - 10} weitere"
+                    value = player_list
+                else:
+                    value = "Niemand angemeldet"
+                
+                embed.add_field(
+                    name=f"{emoji} {role} ({count})",
+                    value=value,
+                    inline=True
+                )
+            
+            # Add creator field
+            embed.add_field(
+                name="👤 Erstellt von",
+                value=f"<@{creator_id}>",
+                inline=True
+            )
+            
+            embed.set_footer(text=f"Event-ID: {event_id} | Verwende /event_info <ID> für Details")
             
             await message.edit(embed=embed)
             

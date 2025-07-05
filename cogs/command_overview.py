@@ -93,12 +93,13 @@ class CommandOverview(commands.Cog):
             inline=False
         )
         
-        # ModMail
+        # ModMail (updated to work in any channel)
         embed.add_field(
             name="📬 ModMail System",
-            value="`!modmail <nachricht>` - Ticket erstellen (DM)\n"
-                  "`/reply` - Auf Ticket antworten (Mods)\n"
-                  "`/close` - Ticket schließen (Mods)",
+            value="`!modmail <nachricht>` - Ticket erstellen (jeder Channel)\n"
+                  "`/modmail` - Ticket per Slash Command erstellen\n"
+                  "`!reply` - Auf Ticket antworten (Mods)\n"
+                  "`!close` - Ticket schließen (Mods)",
             inline=False
         )
         
