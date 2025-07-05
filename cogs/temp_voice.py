@@ -1,4 +1,5 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
 import json
 from database import Database
@@ -232,6 +233,181 @@ class TempVoice(commands.Cog):
                     await before.channel.delete(reason="Temporärer Voice-Channel leer")
                 except discord.HTTPException:
                     pass  # Failed to delete
+    
+    @app_commands.command(name="set-temp-trigger", description="Setzt den Voice-Channel der temporäre Channels erstellt (Nur Moderatoren)")
+    @app_commands.describe(channel="Der Voice-Channel der als Trigger fungiert")
+    async def set_temp_trigger_slash(self, interaction: discord.Interaction, channel: discord.VoiceChannel):
+        """Slash command version of set_temp_trigger"""
+        if not any(role.name.lower() in ['moderator', 'admin'] for role in interaction.user.roles):
+            await interaction.response.send_message("❌ Du hast keine Berechtigung für diesen Befehl!", ephemeral=True)
+            return
+        
+        self.temp_voice_trigger = channel.id
+        
+        embed = discord.Embed(
+            title="⚙️ Temp Voice Trigger gesetzt",
+            description=f"**{channel.name}** ist jetzt der Trigger für temporäre Voice-Channels!",
+            color=0x4CAF50
+        )
+        embed.set_footer(text=f"Gesetzt von {interaction.user.display_name}")
+        await interaction.response.send_message(embed=embed)
+    
+    @app_commands.command(name="create-temp-voice", description="Erstellt einen temporären Voice-Channel")
+    @app_commands.describe(name="Name für den temporären Channel (optional)")
+    async def create_temp_voice_slash(self, interaction: discord.Interaction, name: str = None):
+        """Slash command version of create_temp_voice"""
+        guild = interaction.guild
+        member = interaction.user
+        
+        category_id = self.config['channels']['temp_voice_category']
+        category = guild.get_channel(category_id) if category_id else None
+        
+        # Use provided name or default
+        if not name:
+            name = self.config['temp_voice']['default_name'].format(user=member.display_name)
+        
+        # Validate channel name
+        if len(name) > 50:
+            await interaction.response.send_message("❌ Channel-Name ist zu lang! (Maximum 50 Zeichen)", ephemeral=True)
+            return
+        
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(connect=True, view_channel=True),
+            member: discord.PermissionOverwrite(
+                connect=True,
+                manage_channels=True,
+                manage_permissions=True,
+                move_members=True,
+                mute_members=True,
+                deafen_members=True
+            )
+        }
+        
+        try:
+            temp_channel = await guild.create_voice_channel(
+                name=name,
+                category=category,
+                overwrites=overwrites,
+                reason=f"Temporärer Voice-Channel von {member}"
+            )
+            
+            await self.db.add_temp_voice_channel(temp_channel.id, member.id)
+            
+            embed = discord.Embed(
+                title="🎤 Temporärer Voice-Channel erstellt",
+                description=f"**{temp_channel.name}** wurde erstellt!",
+                color=0x4CAF50
+            )
+            embed.add_field(
+                name="📋 Verfügbare Befehle",
+                value="• `/set-temp-limit` - Benutzerlimit ändern\n"
+                      "• `/rename-temp-channel` - Channel umbenennen\n"
+                      "• `/kick-from-temp` - Benutzer kicken",
+                inline=False
+            )
+            await interaction.response.send_message(embed=embed)
+            
+        except discord.HTTPException as e:
+            await interaction.response.send_message(f"❌ Fehler beim Erstellen des Channels: {e}", ephemeral=True)
+    
+    @app_commands.command(name="set-temp-limit", description="Ändert das Benutzerlimit eines temporären Voice-Channels")
+    @app_commands.describe(limit="Neues Benutzerlimit (0 = unbegrenzt)")
+    async def set_temp_limit_slash(self, interaction: discord.Interaction, limit: int):
+        """Slash command version of set_temp_limit"""
+        if not interaction.user.voice or not interaction.user.voice.channel:
+            await interaction.response.send_message("❌ Du musst in einem Voice-Channel sein!", ephemeral=True)
+            return
+        
+        channel = interaction.user.voice.channel
+        owner_id = await self.db.get_temp_voice_owner(channel.id)
+        
+        if owner_id != interaction.user.id:
+            await interaction.response.send_message("❌ Du bist nicht der Besitzer dieses temporären Channels!", ephemeral=True)
+            return
+        
+        if limit < 0 or limit > 99:
+            await interaction.response.send_message("❌ Limit muss zwischen 0 und 99 liegen!", ephemeral=True)
+            return
+        
+        try:
+            await channel.edit(user_limit=limit)
+            
+            limit_text = "unbegrenzt" if limit == 0 else str(limit)
+            embed = discord.Embed(
+                title="👥 Benutzerlimit geändert",
+                description=f"Das Limit für **{channel.name}** wurde auf **{limit_text}** gesetzt!",
+                color=0x4CAF50
+            )
+            await interaction.response.send_message(embed=embed)
+            
+        except discord.HTTPException as e:
+            await interaction.response.send_message(f"❌ Fehler beim Ändern des Limits: {e}", ephemeral=True)
+    
+    @app_commands.command(name="rename-temp-channel", description="Benennt einen temporären Voice-Channel um")
+    @app_commands.describe(new_name="Neuer Name für den Channel")
+    async def rename_temp_channel_slash(self, interaction: discord.Interaction, new_name: str):
+        """Slash command version of rename_temp_channel"""
+        if not interaction.user.voice or not interaction.user.voice.channel:
+            await interaction.response.send_message("❌ Du musst in einem Voice-Channel sein!", ephemeral=True)
+            return
+        
+        channel = interaction.user.voice.channel
+        owner_id = await self.db.get_temp_voice_owner(channel.id)
+        
+        if owner_id != interaction.user.id:
+            await interaction.response.send_message("❌ Du bist nicht der Besitzer dieses temporären Channels!", ephemeral=True)
+            return
+        
+        if len(new_name) > 50:
+            await interaction.response.send_message("❌ Channel-Name ist zu lang! (Maximum 50 Zeichen)", ephemeral=True)
+            return
+        
+        old_name = channel.name
+        
+        try:
+            await channel.edit(name=new_name)
+            
+            embed = discord.Embed(
+                title="✏️ Channel umbenannt",
+                description=f"**{old_name}** wurde zu **{new_name}** umbenannt!",
+                color=0x4CAF50
+            )
+            await interaction.response.send_message(embed=embed)
+            
+        except discord.HTTPException as e:
+            await interaction.response.send_message(f"❌ Fehler beim Umbenennen: {e}", ephemeral=True)
+    
+    @app_commands.command(name="kick-from-temp", description="Kickt einen Benutzer aus einem temporären Voice-Channel")
+    @app_commands.describe(member="Der Benutzer der gekickt werden soll", reason="Grund für den Kick (optional)")
+    async def kick_from_temp_slash(self, interaction: discord.Interaction, member: discord.Member, reason: str = "Kein Grund angegeben"):
+        """Slash command version of kick_from_temp"""
+        if not interaction.user.voice or not interaction.user.voice.channel:
+            await interaction.response.send_message("❌ Du musst in einem Voice-Channel sein!", ephemeral=True)
+            return
+        
+        channel = interaction.user.voice.channel
+        owner_id = await self.db.get_temp_voice_owner(channel.id)
+        
+        if owner_id != interaction.user.id:
+            await interaction.response.send_message("❌ Du bist nicht der Besitzer dieses temporären Channels!", ephemeral=True)
+            return
+        
+        if member.voice and member.voice.channel == channel:
+            try:
+                await member.move_to(None, reason=f"Gekickt von {interaction.user}: {reason}")
+                
+                embed = discord.Embed(
+                    title="🦵 Benutzer gekickt",
+                    description=f"**{member.display_name}** wurde aus **{channel.name}** gekickt!",
+                    color=0xF44336
+                )
+                embed.add_field(name="📝 Grund", value=reason, inline=False)
+                await interaction.response.send_message(embed=embed)
+                
+            except discord.HTTPException as e:
+                await interaction.response.send_message(f"❌ Fehler beim Kicken: {e}", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ Dieser Benutzer ist nicht in deinem Voice-Channel!", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(TempVoice(bot))

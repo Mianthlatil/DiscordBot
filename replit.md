@@ -131,6 +131,8 @@ temp_voice_channels: channel_id, owner_id, created_at
 - July 05, 2025. Fixed database schema for event titles and improved UI
 - July 05, 2025. Enhanced ModMail system to work in any channel with privacy features
 - July 05, 2025. Added player name display in event registrations by role
+- July 05, 2025. Added comprehensive Slash Command support for ALL commands (23 total)
+- July 05, 2025. Every command from help now available as both text command (!) and slash command (/)
 
 ## User Preferences
 

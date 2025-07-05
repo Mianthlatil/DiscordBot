@@ -106,9 +106,10 @@ class CommandOverview(commands.Cog):
         embed.add_field(
             name="ℹ️ Zusätzliche Infos",
             value="**Prefix:** `!` für Text-Commands\n"
-                  "**Slash:** `/` für Slash-Commands\n"
+                  "**Slash:** `/` für Slash-Commands (ALLE Commands verfügbar!)\n"
                   "**Mods:** Moderator/Admin Berechtigung erforderlich\n"
-                  "**Auto:** Läuft automatisch im Hintergrund",
+                  "**Auto:** Läuft automatisch im Hintergrund\n"
+                  "**Neu:** 23 Slash Commands verfügbar",
             inline=False
         )
         

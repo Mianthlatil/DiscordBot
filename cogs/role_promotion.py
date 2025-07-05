@@ -1,4 +1,5 @@
 import discord
+from discord import app_commands
 from discord.ext import commands, tasks
 import json
 from datetime import datetime, timedelta
@@ -215,6 +216,132 @@ class RolePromotion(commands.Cog):
             
         except discord.HTTPException as e:
             await ctx.send(f"❌ Fehler bei der Beförderung: {e}")
+    
+    @app_commands.command(name="voice-stats", description="Zeigt Voice-Aktivitäts-Statistiken")
+    @app_commands.describe(member="Der Benutzer für den die Statistiken angezeigt werden sollen (optional)")
+    async def voice_stats_slash(self, interaction: discord.Interaction, member: discord.Member = None):
+        """Slash command version of voice_stats"""
+        target = member or interaction.user
+        voice_data = await self.db.get_voice_activity(target.id)
+        
+        total_minutes = voice_data['total_minutes']
+        hours = total_minutes // 60
+        minutes = total_minutes % 60
+        
+        required_minutes = self.config['voice_promotion']['hours_required'] * 60
+        progress = min(100, (total_minutes / required_minutes) * 100)
+        remaining_minutes = max(0, required_minutes - total_minutes)
+        remaining_hours = remaining_minutes // 60
+        remaining_mins = remaining_minutes % 60
+        
+        embed = discord.Embed(
+            title="🎙️ Voice-Aktivitäts-Statistiken",
+            color=0x3498DB
+        )
+        embed.set_author(
+            name=target.display_name,
+            icon_url=target.avatar.url if target.avatar else target.default_avatar.url
+        )
+        
+        embed.add_field(
+            name="⏱️ Gesamte Voice-Zeit",
+            value=f"**{hours}h {minutes}m**",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="📊 Beförderungs-Fortschritt",
+            value=f"**{progress:.1f}%**\n"
+                  f"({'█' * int(progress/10)}{'░' * (10-int(progress/10))})",
+            inline=True
+        )
+        
+        if remaining_minutes > 0:
+            embed.add_field(
+                name="⏳ Verbleibende Zeit",
+                value=f"**{remaining_hours}h {remaining_mins}m**",
+                inline=True
+            )
+        else:
+            embed.add_field(
+                name="✅ Berechtigung",
+                value="**Bereit für Member-Rolle!**",
+                inline=True
+            )
+        
+        # Show current session if in voice
+        if voice_data['session_start']:
+            session_start = datetime.fromisoformat(voice_data['session_start'])
+            session_duration = datetime.now() - session_start
+            session_minutes = int(session_duration.total_seconds() / 60)
+            
+            embed.add_field(
+                name="🔴 Aktuelle Session",
+                value=f"**{session_minutes // 60}h {session_minutes % 60}m**",
+                inline=True
+            )
+        
+        await interaction.response.send_message(embed=embed)
+    
+    @app_commands.command(name="force-promote", description="Befördert einen Benutzer manuell zum Member (Nur Moderatoren)")
+    @app_commands.describe(member="Der Benutzer der befördert werden soll")
+    async def force_promote_slash(self, interaction: discord.Interaction, member: discord.Member):
+        """Slash command version of force_promote"""
+        if not any(role.name.lower() in ['moderator', 'admin'] for role in interaction.user.roles):
+            await interaction.response.send_message("❌ Du hast keine Berechtigung für diesen Befehl!", ephemeral=True)
+            return
+        
+        rekrut_role_id = self.config['roles']['rekrut']
+        member_role_id = self.config['roles']['member']
+        
+        if not rekrut_role_id or not member_role_id:
+            await interaction.response.send_message("❌ Rollen sind nicht konfiguriert!", ephemeral=True)
+            return
+        
+        rekrut_role = interaction.guild.get_role(rekrut_role_id)
+        member_role = interaction.guild.get_role(member_role_id)
+        
+        if not rekrut_role or not member_role:
+            await interaction.response.send_message("❌ Rollen wurden nicht gefunden!", ephemeral=True)
+            return
+        
+        if rekrut_role not in member.roles:
+            await interaction.response.send_message("❌ Benutzer ist kein Rekrut!", ephemeral=True)
+            return
+        
+        try:
+            await member.remove_roles(rekrut_role, reason=f"Manuelle Beförderung von {interaction.user}")
+            await member.add_roles(member_role, reason=f"Manuelle Beförderung von {interaction.user}")
+            
+            # Award promotion bonus
+            promotion_bonus = 1000
+            await self.db.update_user_balance(member.id, promotion_bonus)
+            
+            embed = discord.Embed(
+                title="🎉 Beförderung erfolgreich!",
+                description=f"**{member.display_name}** wurde erfolgreich zum **Member** befördert!\n"
+                           f"Beförderungsbonus: **{promotion_bonus:,}** Spice",
+                color=0x4CAF50
+            )
+            embed.set_footer(text=f"Befördert von {interaction.user.display_name}")
+            
+            await interaction.response.send_message(embed=embed)
+            
+            # Notify the promoted user
+            try:
+                promotion_embed = discord.Embed(
+                    title="🎉 Du wurdest befördert!",
+                    description=f"Du wurdest manuell zum **Member** befördert!\n"
+                               f"Befördert von: **{interaction.user.display_name}**\n\n"
+                               f"Du hast **{promotion_bonus:,}** Spice als Beförderungsbonus erhalten!",
+                    color=0x4CAF50
+                )
+                await member.send(embed=promotion_embed)
+            except discord.Forbidden:
+                pass  # Can't send DM
+            
+        except discord.HTTPException as e:
+            await interaction.response.send_message(f"❌ Fehler bei der Beförderung: {e}", ephemeral=True)
     
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):

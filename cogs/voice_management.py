@@ -1,4 +1,5 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
 import json
 from database import Database
@@ -187,6 +188,164 @@ class VoiceManagement(commands.Cog):
                         
                 except discord.HTTPException:
                     pass  # Failed to disconnect user
+    
+    @app_commands.command(name="lock-voice", description="Sperrt einen Voice-Channel (Nur Moderatoren)")
+    @app_commands.describe(channel="Der Voice-Channel der gesperrt werden soll")
+    async def lock_voice_slash(self, interaction: discord.Interaction, channel: discord.VoiceChannel = None):
+        """Slash command version of lock_voice"""
+        if not any(role.name.lower() in ['moderator', 'admin'] for role in interaction.user.roles):
+            await interaction.response.send_message("❌ Du hast keine Berechtigung für diesen Befehl!", ephemeral=True)
+            return
+        
+        if not channel:
+            if interaction.user.voice and interaction.user.voice.channel:
+                channel = interaction.user.voice.channel
+            else:
+                await interaction.response.send_message("❌ Du musst in einem Voice-Channel sein oder einen Channel angeben!", ephemeral=True)
+                return
+        
+        # Lock channel for @everyone
+        overwrite = channel.overwrites_for(interaction.guild.default_role)
+        overwrite.connect = False
+        await channel.set_permissions(interaction.guild.default_role, overwrite=overwrite)
+        
+        embed = discord.Embed(
+            title="🔒 Voice-Channel gesperrt",
+            description=f"**{channel.name}** wurde gesperrt!",
+            color=0xF44336
+        )
+        embed.set_footer(text=f"Gesperrt von {interaction.user.display_name}")
+        await interaction.response.send_message(embed=embed)
+    
+    @app_commands.command(name="unlock-voice", description="Entsperrt einen Voice-Channel (Nur Moderatoren)")
+    @app_commands.describe(channel="Der Voice-Channel der entsperrt werden soll")
+    async def unlock_voice_slash(self, interaction: discord.Interaction, channel: discord.VoiceChannel = None):
+        """Slash command version of unlock_voice"""
+        if not any(role.name.lower() in ['moderator', 'admin'] for role in interaction.user.roles):
+            await interaction.response.send_message("❌ Du hast keine Berechtigung für diesen Befehl!", ephemeral=True)
+            return
+        
+        if not channel:
+            if interaction.user.voice and interaction.user.voice.channel:
+                channel = interaction.user.voice.channel
+            else:
+                await interaction.response.send_message("❌ Du musst in einem Voice-Channel sein oder einen Channel angeben!", ephemeral=True)
+                return
+        
+        # Unlock channel for @everyone
+        overwrite = channel.overwrites_for(interaction.guild.default_role)
+        overwrite.connect = True
+        await channel.set_permissions(interaction.guild.default_role, overwrite=overwrite)
+        
+        embed = discord.Embed(
+            title="🔓 Voice-Channel entsperrt",
+            description=f"**{channel.name}** wurde entsperrt!",
+            color=0x4CAF50
+        )
+        embed.set_footer(text=f"Entsperrt von {interaction.user.display_name}")
+        await interaction.response.send_message(embed=embed)
+    
+    @app_commands.command(name="rage-lock", description="Aktiviert Rage Lock für einen Voice-Channel (Nur Moderatoren)")
+    @app_commands.describe(channel="Der Voice-Channel für den Rage Lock aktiviert werden soll")
+    async def rage_lock_slash(self, interaction: discord.Interaction, channel: discord.VoiceChannel = None):
+        """Slash command version of rage_lock"""
+        if not any(role.name.lower() in ['moderator', 'admin'] for role in interaction.user.roles):
+            await interaction.response.send_message("❌ Du hast keine Berechtigung für diesen Befehl!", ephemeral=True)
+            return
+        
+        if not channel:
+            if interaction.user.voice and interaction.user.voice.channel:
+                channel = interaction.user.voice.channel
+            else:
+                await interaction.response.send_message("❌ Du musst in einem Voice-Channel sein oder einen Channel angeben!", ephemeral=True)
+                return
+        
+        self.rage_lock_channels.add(channel.id)
+        
+        embed = discord.Embed(
+            title="😡 Rage Lock aktiviert",
+            description=f"**{channel.name}** ist jetzt im Rage Lock Modus!\n"
+                       f"Neue Benutzer werden automatisch gekickt.",
+            color=0xFF5722
+        )
+        embed.set_footer(text=f"Aktiviert von {interaction.user.display_name}")
+        await interaction.response.send_message(embed=embed)
+    
+    @app_commands.command(name="un-rage-lock", description="Deaktiviert Rage Lock für einen Voice-Channel (Nur Moderatoren)")
+    @app_commands.describe(channel="Der Voice-Channel für den Rage Lock deaktiviert werden soll")
+    async def un_rage_lock_slash(self, interaction: discord.Interaction, channel: discord.VoiceChannel = None):
+        """Slash command version of un_rage_lock"""
+        if not any(role.name.lower() in ['moderator', 'admin'] for role in interaction.user.roles):
+            await interaction.response.send_message("❌ Du hast keine Berechtigung für diesen Befehl!", ephemeral=True)
+            return
+        
+        if not channel:
+            if interaction.user.voice and interaction.user.voice.channel:
+                channel = interaction.user.voice.channel
+            else:
+                await interaction.response.send_message("❌ Du musst in einem Voice-Channel sein oder einen Channel angeben!", ephemeral=True)
+                return
+        
+        self.rage_lock_channels.discard(channel.id)
+        
+        embed = discord.Embed(
+            title="😌 Rage Lock deaktiviert",
+            description=f"**{channel.name}** ist nicht mehr im Rage Lock Modus!",
+            color=0x4CAF50
+        )
+        embed.set_footer(text=f"Deaktiviert von {interaction.user.display_name}")
+        await interaction.response.send_message(embed=embed)
+    
+    @app_commands.command(name="move-all", description="Verschiebt alle Benutzer zu einem anderen Voice-Channel (Nur Moderatoren)")
+    @app_commands.describe(target_channel="Der Ziel-Voice-Channel")
+    async def move_all_slash(self, interaction: discord.Interaction, target_channel: discord.VoiceChannel):
+        """Slash command version of move_all"""
+        if not any(role.name.lower() in ['moderator', 'admin'] for role in interaction.user.roles):
+            await interaction.response.send_message("❌ Du hast keine Berechtigung für diesen Befehl!", ephemeral=True)
+            return
+        
+        if not interaction.user.voice or not interaction.user.voice.channel:
+            await interaction.response.send_message("❌ Du musst in einem Voice-Channel sein!", ephemeral=True)
+            return
+        
+        source_channel = interaction.user.voice.channel
+        
+        if source_channel == target_channel:
+            await interaction.response.send_message("❌ Quell- und Ziel-Channel sind identisch!", ephemeral=True)
+            return
+        
+        members_to_move = [m for m in source_channel.members if not m.bot]
+        
+        if not members_to_move:
+            await interaction.response.send_message("❌ Keine Benutzer im aktuellen Channel!", ephemeral=True)
+            return
+        
+        await interaction.response.defer()
+        
+        moved_count = 0
+        failed_moves = []
+        
+        for member in members_to_move:
+            try:
+                await member.move_to(target_channel, reason=f"Move All von {interaction.user}")
+                moved_count += 1
+            except discord.HTTPException:
+                failed_moves.append(member.display_name)
+        
+        embed = discord.Embed(
+            title="🔄 Benutzer verschoben",
+            description=f"**{moved_count}** Benutzer von **{source_channel.name}** zu **{target_channel.name}** verschoben!",
+            color=0x4CAF50
+        )
+        
+        if failed_moves:
+            embed.add_field(
+                name="⚠️ Fehler beim Verschieben",
+                value=", ".join(failed_moves),
+                inline=False
+            )
+        
+        await interaction.followup.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(VoiceManagement(bot))
