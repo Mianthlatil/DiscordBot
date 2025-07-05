@@ -101,8 +101,8 @@ class EventSystem(commands.Cog):
         
         message = await send_func(embed=embed)
         
-        # Add reaction buttons (only Attack and Def)
-        reactions = ['🗡️', '🛡️']
+        # Add reaction buttons (Attack, Def, and unregister)
+        reactions = ['🗡️', '🛡️', '❌']
         for reaction in reactions:
             await message.add_reaction(reaction)
         
@@ -302,6 +302,38 @@ class EventSystem(commands.Cog):
         footer_text = message.embeds[0].footer.text
         event_id = footer_text.split("Event-ID: ")[1].split(" |")[0]
         
+        # Check for unregister reaction (❌)
+        if str(reaction.emoji) == "❌":
+            # Remove user from event
+            success = await self.unregister_from_event(event_id, user.id)
+            
+            if success:
+                await reaction.remove(user)
+                try:
+                    embed = discord.Embed(
+                        title="✅ Erfolgreich abgemeldet!",
+                        description=f"Du wurdest vom Event abgemeldet!",
+                        color=0x4CAF50
+                    )
+                    await user.send(embed=embed)
+                except discord.Forbidden:
+                    pass
+                
+                # Update the event message
+                await self.update_event_message(event_id)
+            else:
+                await reaction.remove(user)
+                try:
+                    embed = discord.Embed(
+                        title="❌ Nicht angemeldet",
+                        description=f"Du warst nicht für dieses Event angemeldet!",
+                        color=0xFF6B6B
+                    )
+                    await user.send(embed=embed)
+                except discord.Forbidden:
+                    pass
+            return
+        
         if str(reaction.emoji) in self.event_roles:
             role = self.event_roles[str(reaction.emoji)]
             
@@ -404,6 +436,17 @@ class EventSystem(commands.Cog):
             except Exception:
                 return False  # Already registered
     
+    async def unregister_from_event(self, event_id, user_id):
+        """Unregister user from an event"""
+        import aiosqlite
+        async with aiosqlite.connect(self.db.db_path) as db:
+            cursor = await db.execute('''
+                DELETE FROM event_registrations
+                WHERE event_id = ? AND user_id = ?
+            ''', (event_id, user_id))
+            await db.commit()
+            return cursor.rowcount > 0
+    
     async def get_event_registrations(self, event_id):
         """Get all registrations for an event"""
         import aiosqlite
@@ -444,11 +487,11 @@ class EventSystem(commands.Cog):
             # Get current registrations
             registrations = await self.get_event_registrations(event_id)
             
-            # Group by role with player names
+            # Group by role with player mentions
             role_groups = {'Attack': [], 'Def': [], 'Crawler': [], 'Carrier': []}
             for user_id, username, role, registered_at in registrations:
                 if role in role_groups:
-                    role_groups[role].append(username)
+                    role_groups[role].append(f"<@{user_id}>")
             
             # Create new embed with updated data
             embed = discord.Embed(
@@ -458,35 +501,73 @@ class EventSystem(commands.Cog):
                 timestamp=datetime.now()
             )
             
-            # Add role fields with player names
-            role_emojis = {'Attack': '🗡️', 'Def': '🛡️', 'Crawler': '⛏️', 'Carrier': '📦'}
-            
-            for role, players in role_groups.items():
-                emoji = role_emojis[role]
-                count = len(players)
-                
-                if players:
-                    player_list = '\n'.join(f"• {player}" for player in players[:10])  # Limit to 10 for space
-                    if len(players) > 10:
-                        player_list += f"\n... und {len(players) - 10} weitere"
-                    value = player_list
-                else:
-                    value = "Niemand angemeldet"
-                
-                embed.add_field(
-                    name=f"{emoji} {role} ({count})",
-                    value=value,
-                    inline=True
-                )
-            
-            # Add creator field
+            # Add creator field at the top
             embed.add_field(
-                name="👤 Erstellt von",
+                name="👑 Erstellt von",
                 value=f"<@{creator_id}>",
+                inline=False
+            )
+            
+            # Custom emojis für die Rollen
+            role_emojis = {
+                'Crawler': '<:crawler:123456789>',  # Placeholder - Nutzer muss echte Emoji-IDs setzen
+                'Carrier': '<:carrier:123456789>',  # Placeholder - Nutzer muss echte Emoji-IDs setzen
+                'Attack': '⚔️', 
+                'Def': '🛡️'
+            }
+            
+            # Crawler und Carrier nebeneinander (oben)
+            crawler_count = len(role_groups['Crawler'])
+            carrier_count = len(role_groups['Carrier'])
+            
+            crawler_value = '\n'.join(role_groups['Crawler'][:8]) if role_groups['Crawler'] else "Niemand angemeldet"
+            if len(role_groups['Crawler']) > 8:
+                crawler_value += f"\n... +{len(role_groups['Crawler']) - 8} weitere"
+            
+            carrier_value = '\n'.join(role_groups['Carrier'][:8]) if role_groups['Carrier'] else "Niemand angemeldet"
+            if len(role_groups['Carrier']) > 8:
+                carrier_value += f"\n... +{len(role_groups['Carrier']) - 8} weitere"
+            
+            embed.add_field(
+                name=f"{role_emojis['Crawler']} Crawler ({crawler_count})",
+                value=crawler_value,
                 inline=True
             )
             
-            embed.set_footer(text=f"Event-ID: {event_id} | Verwende /event_info <ID> für Details")
+            embed.add_field(
+                name=f"{role_emojis['Carrier']} Carrier ({carrier_count})",
+                value=carrier_value,
+                inline=True
+            )
+            
+            # Empty field for layout spacing
+            embed.add_field(name="\u200b", value="\u200b", inline=True)
+            
+            # Attack und Def nebeneinander (unten)
+            attack_count = len(role_groups['Attack'])
+            def_count = len(role_groups['Def'])
+            
+            attack_value = '\n'.join(role_groups['Attack'][:8]) if role_groups['Attack'] else "Niemand angemeldet"
+            if len(role_groups['Attack']) > 8:
+                attack_value += f"\n... +{len(role_groups['Attack']) - 8} weitere"
+            
+            def_value = '\n'.join(role_groups['Def'][:8]) if role_groups['Def'] else "Niemand angemeldet"
+            if len(role_groups['Def']) > 8:
+                def_value += f"\n... +{len(role_groups['Def']) - 8} weitere"
+            
+            embed.add_field(
+                name=f"{role_emojis['Attack']} Attack ({attack_count})",
+                value=attack_value,
+                inline=True
+            )
+            
+            embed.add_field(
+                name=f"{role_emojis['Def']} Def ({def_count})",
+                value=def_value,
+                inline=True
+            )
+            
+            embed.set_footer(text=f"Event-ID: {event_id} | ❌ zum Abmelden | ⚔️ Attack | 🛡️ Def")
             
             await message.edit(embed=embed)
             
