@@ -7,6 +7,7 @@ from discord.ext import commands
 import asyncio
 import threading
 from functools import wraps
+import traceback
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'your-secret-key-here')
@@ -26,6 +27,28 @@ def save_config(config):
     """Save configuration to JSON file"""
     with open('config.json', 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=4, ensure_ascii=False)
+
+def get_discord_roles():
+    """Get Discord roles from the bot instance"""
+    try:
+        config = load_config()
+        guild_id = config.get('guild_id')
+        
+        if not guild_id:
+            return []
+        
+        # Try to get roles from existing bot instance or create temporary connection
+        import main
+        if hasattr(main, 'bot') and main.bot.is_ready():
+            guild = main.bot.get_guild(guild_id)
+            if guild:
+                return [{'id': role.id, 'name': role.name, 'color': str(role.color)} 
+                       for role in guild.roles if role.name != '@everyone']
+        
+        return []
+    except Exception as e:
+        print(f"Error fetching Discord roles: {e}")
+        return []
 
 def require_auth(f):
     """Decorator to require authentication"""
@@ -234,6 +257,13 @@ def temp_voice():
 def api_config():
     """API endpoint to get current config"""
     return jsonify(load_config())
+
+@app.route('/api/discord_roles')
+@require_auth
+def api_discord_roles():
+    """API endpoint to get Discord roles"""
+    roles = get_discord_roles()
+    return jsonify(roles)
 
 @app.route('/reset_permissions', methods=['POST'])
 @require_auth
