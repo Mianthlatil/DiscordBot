@@ -29,6 +29,7 @@ async def on_ready():
     
     # Load all cogs
     cogs_to_load = [
+        'cogs.setup',
         'cogs.command_overview',
         'cogs.economy',
         'cogs.voice_management', 

@@ -18,7 +18,7 @@
         "check_interval": 300
     },
     "temp_voice": {
-        "default_name": "{user}"'s Channel,
+        "default_name": "{user}'s Channel",
         "default_limit": 100
     }
 }
