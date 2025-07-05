@@ -8,12 +8,13 @@ def load_config():
     with open('config.json', 'r', encoding='utf-8') as f:
         return json.load(f)
 
-def has_role_permission(required_roles):
+def has_role_permission(required_roles, command_name=None):
     """
     Decorator to check if user has required roles
     
     Args:
-        required_roles (list): List of role names that can use the command
+        required_roles (list): Default list of role names that can use the command
+        command_name (str): Optional command name to check custom permissions
     """
     def decorator(func):
         @wraps(func)
@@ -23,6 +24,11 @@ def has_role_permission(required_roles):
             # Server owners and bot owners bypass all restrictions
             if ctx.author.id == ctx.guild.owner_id:
                 return await func(self, ctx, *args, **kwargs)
+            
+            # Check for custom command permissions first
+            custom_permissions = config.get('command_permissions', {})
+            if command_name and command_name in custom_permissions:
+                required_roles = custom_permissions[command_name]
             
             # Check if user has any of the required roles
             user_role_ids = [role.id for role in ctx.author.roles]
@@ -170,3 +176,35 @@ def format_permission_error(required_permissions, user_permission):
     )
     
     return embed
+
+def check_command_permission(user, command_name, default_roles):
+    """
+    Check if user has permission for a specific command
+    
+    Args:
+        user: Discord member object
+        command_name: Name of the command
+        default_roles: Default required roles if no custom config exists
+        
+    Returns:
+        bool: True if user has permission, False otherwise
+    """
+    config = load_config()
+    
+    # Server owners bypass all restrictions
+    if user.id == user.guild.owner_id:
+        return True
+    
+    # Check for custom command permissions
+    custom_permissions = config.get('command_permissions', {})
+    required_roles = custom_permissions.get(command_name, default_roles)
+    
+    # Check if user has any of the required roles
+    user_role_ids = [role.id for role in user.roles]
+    
+    for role_name in required_roles:
+        role_id = config['roles'].get(role_name)
+        if role_id and role_id in user_role_ids:
+            return True
+    
+    return False

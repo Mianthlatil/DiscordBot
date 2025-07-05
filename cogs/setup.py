@@ -39,6 +39,7 @@ class Setup(commands.Cog):
         app_commands.Choice(name="Kanäle", value="channels"),
         app_commands.Choice(name="Voice Promotion", value="voice_promo"),
         app_commands.Choice(name="Temp Voice", value="temp_voice"),
+        app_commands.Choice(name="Command Berechtigungen", value="permissions"),
         app_commands.Choice(name="Alle anzeigen", value="show_all")
     ])
     async def setup_command(self, interaction: discord.Interaction, component: str, guild_id: str = None, prefix: str = None):
@@ -62,6 +63,8 @@ class Setup(commands.Cog):
             await self.setup_voice_promotion(interaction)
         elif component == "temp_voice":
             await self.setup_temp_voice(interaction)
+        elif component == "permissions":
+            await self.setup_permissions(interaction)
 
     async def show_current_config(self, interaction):
         """Show current configuration"""
@@ -115,6 +118,16 @@ class Setup(commands.Cog):
             value=f"**Stunden benötigt:** {voice_promo.get('hours_required', 24)}\n"
                   f"**Check Intervall:** {voice_promo.get('check_interval', 300)}s",
             inline=False
+        )
+
+        # Command permissions
+        permissions = config.get('command_permissions', {})
+        perm_status = "✅ Konfiguriert" if permissions else "❌ Standard verwendet"
+        embed.add_field(
+            name="🔐 Command Berechtigungen",
+            value=f"**Status:** {perm_status}\n"
+                  f"**Commands konfiguriert:** {len(permissions)}",
+            inline=True
         )
 
         embed.set_footer(text="Verwende /setup um Einstellungen zu ändern")
@@ -181,6 +194,18 @@ class Setup(commands.Cog):
             title="🔊 Temporäre Voice Kanäle Setup",
             description="Konfiguriere die Einstellungen für temporäre Voice Kanäle:",
             color=0x1ABC9C
+        )
+        await interaction.response.send_message(embed=embed, view=view)
+
+    async def setup_permissions(self, interaction):
+        """Setup command permissions"""
+        view = PermissionSetupView(self)
+        embed = discord.Embed(
+            title="🔐 Command Berechtigungen Setup",
+            description="Konfiguriere welche Rollen welche Befehle verwenden können:\n\n"
+                       "**Standard Hierarchie:**\n"
+                       "👑 Admin > 🛡️ Moderator > ⚔️ Raid Leader > 🥈 Member > 🥉 Rekrut",
+            color=0x8E44AD
         )
         await interaction.response.send_message(embed=embed, view=view)
 
@@ -445,6 +470,227 @@ class TempVoiceLimitModal(discord.ui.Modal):
             await interaction.response.send_message(embed=embed)
         except ValueError as e:
             await interaction.response.send_message(f"❌ {str(e)}", ephemeral=True)
+
+class PermissionSetupView(discord.ui.View):
+    def __init__(self, setup_cog):
+        super().__init__(timeout=300)
+        self.setup_cog = setup_cog
+
+    @discord.ui.select(
+        placeholder="Wähle eine Command-Kategorie...",
+        options=[
+            discord.SelectOption(label="Economy Commands", value="economy", emoji="💰"),
+            discord.SelectOption(label="Event System", value="events", emoji="⚔️"),
+            discord.SelectOption(label="Voice Management", value="voice", emoji="🎙️"),
+            discord.SelectOption(label="Temp Voice", value="temp_voice", emoji="🔊"),
+            discord.SelectOption(label="Raid System", value="raids", emoji="🏜️"),
+            discord.SelectOption(label="ModMail", value="modmail", emoji="📬"),
+            discord.SelectOption(label="Role Promotion", value="promotion", emoji="🎖️"),
+            discord.SelectOption(label="Alle zurücksetzen", value="reset_all", emoji="🔄"),
+        ]
+    )
+    async def category_select(self, interaction: discord.Interaction, select: discord.ui.Select):
+        category = select.values[0]
+        
+        if category == "reset_all":
+            await interaction.response.send_modal(ResetPermissionsModal(self.setup_cog))
+        else:
+            await interaction.response.send_message(
+                view=CommandPermissionView(self.setup_cog, category),
+                embed=self.create_category_embed(category),
+                ephemeral=True
+            )
+
+    def create_category_embed(self, category):
+        """Create embed for specific command category"""
+        category_info = {
+            "economy": {
+                "title": "💰 Economy Commands",
+                "commands": ["balance", "leaderboard", "give", "take"],
+                "description": "Spice-System Befehle"
+            },
+            "events": {
+                "title": "⚔️ Event System", 
+                "commands": ["event", "event-edit", "event_info", "crawler", "carrier"],
+                "description": "Event-Management Befehle"
+            },
+            "voice": {
+                "title": "🎙️ Voice Management",
+                "commands": ["lockvoice", "unlockvoice", "ragelock", "moveall", "voice_stats"],
+                "description": "Voice-Channel Verwaltung"
+            },
+            "temp_voice": {
+                "title": "🔊 Temp Voice",
+                "commands": ["temp_voice", "temp_limit", "temp_name", "temp_kick"],
+                "description": "Temporäre Voice-Channels"
+            },
+            "raids": {
+                "title": "🏜️ Raid System",
+                "commands": ["createraid", "anmelden", "raid_info", "spice_crawl"],
+                "description": "Raid-Management"
+            },
+            "modmail": {
+                "title": "📬 ModMail",
+                "commands": ["modmail", "reply", "close"],
+                "description": "Support-Ticket System"
+            },
+            "promotion": {
+                "title": "🎖️ Role Promotion",
+                "commands": ["force_promote", "voice_stats"],
+                "description": "Automatische Beförderungen"
+            }
+        }
+        
+        info = category_info[category]
+        embed = discord.Embed(
+            title=info["title"],
+            description=f"{info['description']}\n\n**Commands in dieser Kategorie:**\n" + 
+                       "\n".join([f"• `{cmd}`" for cmd in info["commands"]]),
+            color=0x8E44AD
+        )
+        return embed
+
+class CommandPermissionView(discord.ui.View):
+    def __init__(self, setup_cog, category):
+        super().__init__(timeout=300)
+        self.setup_cog = setup_cog
+        self.category = category
+
+    @discord.ui.select(
+        placeholder="Welche Rollen sollen Zugriff haben?",
+        options=[
+            discord.SelectOption(label="Nur Admins", value="admin_only", emoji="👑"),
+            discord.SelectOption(label="Admins + Moderatoren", value="admin_mod", emoji="🛡️"),
+            discord.SelectOption(label="Admins + Mods + Raid Leader", value="admin_mod_raid", emoji="⚔️"),
+            discord.SelectOption(label="Alle außer Rekruts", value="no_rekrut", emoji="🥈"),
+            discord.SelectOption(label="Alle Rollen", value="all_roles", emoji="👥"),
+            discord.SelectOption(label="Individuell konfigurieren", value="custom", emoji="⚙️"),
+        ]
+    )
+    async def permission_select(self, interaction: discord.Interaction, select: discord.ui.Select):
+        permission_level = select.values[0]
+        
+        if permission_level == "custom":
+            await interaction.response.send_modal(CustomPermissionModal(self.setup_cog, self.category))
+        else:
+            await self.set_category_permissions(interaction, permission_level)
+
+    async def set_category_permissions(self, interaction, permission_level):
+        """Set permissions for entire command category"""
+        permission_mapping = {
+            "admin_only": ["admin"],
+            "admin_mod": ["admin", "moderator"],
+            "admin_mod_raid": ["admin", "moderator", "raid_leader"],
+            "no_rekrut": ["admin", "moderator", "raid_leader", "member"],
+            "all_roles": ["admin", "moderator", "raid_leader", "member", "rekrut"]
+        }
+        
+        roles = permission_mapping[permission_level]
+        
+        # Get commands for this category
+        category_commands = {
+            "economy": ["balance", "leaderboard", "give", "take"],
+            "events": ["event", "event-edit", "event_info", "crawler", "carrier"],
+            "voice": ["lockvoice", "unlockvoice", "ragelock", "moveall", "voice_stats"],
+            "temp_voice": ["temp_voice", "temp_limit", "temp_name", "temp_kick"],
+            "raids": ["createraid", "anmelden", "raid_info", "spice_crawl"],
+            "modmail": ["modmail", "reply", "close"],
+            "promotion": ["force_promote", "voice_stats"]
+        }
+        
+        commands = category_commands.get(self.category, [])
+        
+        # Update config for each command
+        for command in commands:
+            await self.setup_cog.update_config(f'command_permissions.{command}', roles)
+        
+        embed = discord.Embed(
+            title="✅ Berechtigungen aktualisiert",
+            description=f"**Kategorie:** {self.category.title()}\n"
+                       f"**Befehle:** {len(commands)}\n"
+                       f"**Berechtigte Rollen:** {', '.join([r.title() for r in roles])}",
+            color=0x4CAF50
+        )
+        await interaction.response.send_message(embed=embed)
+
+class CustomPermissionModal(discord.ui.Modal):
+    def __init__(self, setup_cog, category):
+        super().__init__(title=f"Custom Permissions: {category.title()}")
+        self.setup_cog = setup_cog
+        self.category = category
+
+        self.command_input = discord.ui.TextInput(
+            label="Command Name",
+            placeholder="z.B. balance, give, lockvoice",
+            required=True
+        )
+        self.add_item(self.command_input)
+
+        self.roles_input = discord.ui.TextInput(
+            label="Erlaubte Rollen (kommagetrennt)",
+            placeholder="admin,moderator,member",
+            required=True,
+            style=discord.TextStyle.paragraph
+        )
+        self.add_item(self.roles_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        command = self.command_input.value.strip()
+        roles_str = self.roles_input.value.strip()
+        
+        # Parse roles
+        roles = [role.strip().lower() for role in roles_str.split(',')]
+        valid_roles = ['admin', 'moderator', 'raid_leader', 'member', 'rekrut']
+        
+        # Validate roles
+        invalid_roles = [role for role in roles if role not in valid_roles]
+        if invalid_roles:
+            await interaction.response.send_message(
+                f"❌ Ungültige Rollen: {', '.join(invalid_roles)}\n"
+                f"**Gültige Rollen:** {', '.join(valid_roles)}", 
+                ephemeral=True
+            )
+            return
+        
+        # Update config
+        await self.setup_cog.update_config(f'command_permissions.{command}', roles)
+        
+        embed = discord.Embed(
+            title="✅ Command Berechtigung gesetzt",
+            description=f"**Command:** `{command}`\n"
+                       f"**Berechtigte Rollen:** {', '.join([r.title() for r in roles])}",
+            color=0x4CAF50
+        )
+        await interaction.response.send_message(embed=embed)
+
+class ResetPermissionsModal(discord.ui.Modal):
+    def __init__(self, setup_cog):
+        super().__init__(title="Alle Berechtigungen zurücksetzen")
+        self.setup_cog = setup_cog
+
+        self.confirm_input = discord.ui.TextInput(
+            label="Bestätigung (schreibe: RESET)",
+            placeholder="RESET",
+            required=True,
+            max_length=5
+        )
+        self.add_item(self.confirm_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if self.confirm_input.value.upper() != "RESET":
+            await interaction.response.send_message("❌ Bestätigung fehlgeschlagen!", ephemeral=True)
+            return
+
+        # Reset all command permissions
+        await self.setup_cog.update_config('command_permissions', {})
+        
+        embed = discord.Embed(
+            title="✅ Berechtigungen zurückgesetzt",
+            description="Alle Command-Berechtigungen wurden auf Standard zurückgesetzt.\n"
+                       "Der Bot verwendet jetzt wieder die eingebauten Berechtigungen.",
+            color=0x4CAF50
+        )
+        await interaction.response.send_message(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Setup(bot))
