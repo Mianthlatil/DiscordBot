@@ -204,7 +204,8 @@ class Setup(commands.Cog):
             title="🔐 Command Berechtigungen Setup",
             description="Konfiguriere welche Rollen welche Befehle verwenden können:\n\n"
                        "**Standard Hierarchie:**\n"
-                       "👑 Admin > 🛡️ Moderator > ⚔️ Raid Leader > 🥈 Member > 🥉 Rekrut",
+                       "👑 Admin > 🛡️ Moderator > ⚔️ Raid Leader > 🥈 Member > 🥉 Rekrut\n\n"
+                       "**Wähle eine Option:**",
             color=0x8E44AD
         )
         await interaction.response.send_message(embed=embed, view=view)
@@ -476,79 +477,240 @@ class PermissionSetupView(discord.ui.View):
         super().__init__(timeout=300)
         self.setup_cog = setup_cog
 
-    @discord.ui.select(
-        placeholder="Wähle eine Command-Kategorie...",
-        options=[
-            discord.SelectOption(label="Economy Commands", value="economy", emoji="💰"),
-            discord.SelectOption(label="Event System", value="events", emoji="⚔️"),
-            discord.SelectOption(label="Voice Management", value="voice", emoji="🎙️"),
-            discord.SelectOption(label="Temp Voice", value="temp_voice", emoji="🔊"),
-            discord.SelectOption(label="Raid System", value="raids", emoji="🏜️"),
-            discord.SelectOption(label="ModMail", value="modmail", emoji="📬"),
-            discord.SelectOption(label="Role Promotion", value="promotion", emoji="🎖️"),
-            discord.SelectOption(label="Alle zurücksetzen", value="reset_all", emoji="🔄"),
-        ]
-    )
-    async def category_select(self, interaction: discord.Interaction, select: discord.ui.Select):
-        category = select.values[0]
-        
-        if category == "reset_all":
-            await interaction.response.send_modal(ResetPermissionsModal(self.setup_cog))
-        else:
-            await interaction.response.send_message(
-                view=CommandPermissionView(self.setup_cog, category),
-                embed=self.create_category_embed(category),
-                ephemeral=True
-            )
-
-    def create_category_embed(self, category):
-        """Create embed for specific command category"""
-        category_info = {
-            "economy": {
-                "title": "💰 Economy Commands",
-                "commands": ["balance", "leaderboard", "give", "take"],
-                "description": "Spice-System Befehle"
-            },
-            "events": {
-                "title": "⚔️ Event System", 
-                "commands": ["event", "event-edit", "event_info", "crawler", "carrier"],
-                "description": "Event-Management Befehle"
-            },
-            "voice": {
-                "title": "🎙️ Voice Management",
-                "commands": ["lockvoice", "unlockvoice", "ragelock", "moveall", "voice_stats"],
-                "description": "Voice-Channel Verwaltung"
-            },
-            "temp_voice": {
-                "title": "🔊 Temp Voice",
-                "commands": ["temp_voice", "temp_limit", "temp_name", "temp_kick"],
-                "description": "Temporäre Voice-Channels"
-            },
-            "raids": {
-                "title": "🏜️ Raid System",
-                "commands": ["createraid", "anmelden", "raid_info", "spice_crawl"],
-                "description": "Raid-Management"
-            },
-            "modmail": {
-                "title": "📬 ModMail",
-                "commands": ["modmail", "reply", "close"],
-                "description": "Support-Ticket System"
-            },
-            "promotion": {
-                "title": "🎖️ Role Promotion",
-                "commands": ["force_promote", "voice_stats"],
-                "description": "Automatische Beförderungen"
-            }
-        }
-        
-        info = category_info[category]
+    @discord.ui.button(label="Individuelle Commands", style=discord.ButtonStyle.primary, emoji="⚙️")
+    async def individual_commands(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Show individual command permission setup"""
+        view = IndividualCommandView(self.setup_cog)
         embed = discord.Embed(
-            title=info["title"],
-            description=f"{info['description']}\n\n**Commands in dieser Kategorie:**\n" + 
-                       "\n".join([f"• `{cmd}`" for cmd in info["commands"]]),
+            title="⚙️ Individuelle Command Berechtigungen",
+            description="Wähle einen Command aus der Liste um die Berechtigungen zu konfigurieren:",
             color=0x8E44AD
         )
-        return embed
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    @discord.ui.button(label="Alle Commands anzeigen", style=discord.ButtonStyle.secondary, emoji="📋")
+    async def show_all_commands(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Show all command permissions"""
+        await self.show_current_permissions(interaction)
+
+    @discord.ui.button(label="Alle zurücksetzen", style=discord.ButtonStyle.danger, emoji="🔄")
+    async def reset_all(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(ResetPermissionsModal(self.setup_cog))
+
+    async def show_current_permissions(self, interaction):
+        """Show current permission configuration for all commands"""
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        permissions = config.get('command_permissions', {})
+        
+        embed = discord.Embed(
+            title="📋 Aktuelle Command Berechtigungen",
+            description="Übersicht aller konfigurierten Command-Berechtigungen:",
+            color=0x3498DB
+        )
+        
+        if not permissions:
+            embed.add_field(
+                name="Keine Konfiguration",
+                value="Alle Commands verwenden Standard-Berechtigungen",
+                inline=False
+            )
+        else:
+            # Group commands by permission level
+            grouped = {}
+            for cmd, roles in permissions.items():
+                role_key = ", ".join(sorted(roles))
+                if role_key not in grouped:
+                    grouped[role_key] = []
+                grouped[role_key].append(cmd)
+            
+            for roles, commands in grouped.items():
+                embed.add_field(
+                    name=f"🔐 {roles.title()}",
+                    value="```\n" + "\n".join([f"• {cmd}" for cmd in sorted(commands)]) + "\n```",
+                    inline=False
+                )
+        
+        embed.set_footer(text="Verwende 'Individuelle Commands' um Änderungen vorzunehmen")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+class IndividualCommandView(discord.ui.View):
+    def __init__(self, setup_cog):
+        super().__init__(timeout=300)
+        self.setup_cog = setup_cog
+        
+        # Liste aller verfügbaren Commands
+        self.all_commands = [
+            # Economy Commands
+            "balance", "leaderboard", "give", "take",
+            # Event System
+            "event", "event-edit", "event_info", "crawler", "carrier",
+            # Voice Management
+            "lockvoice", "unlockvoice", "ragelock", "moveall", "voice_stats",
+            # Temp Voice
+            "temp_voice", "temp_limit", "temp_name", "temp_kick",
+            # Raid System
+            "createraid", "anmelden", "raid_info", "spice_crawl",
+            # ModMail
+            "modmail", "reply", "close",
+            # Role Promotion
+            "force_promote",
+            # Setup
+            "setup", "commands"
+        ]
+
+    @discord.ui.select(
+        placeholder="Wähle einen Command aus...",
+        options=[
+            # Economy Commands
+            discord.SelectOption(label="balance", value="balance", emoji="💰", description="Spice Balance anzeigen"),
+            discord.SelectOption(label="leaderboard", value="leaderboard", emoji="🏆", description="Spice Leaderboard"),
+            discord.SelectOption(label="give", value="give", emoji="💝", description="Spice vergeben"),
+            discord.SelectOption(label="take", value="take", emoji="💸", description="Spice entziehen"),
+            # Event System
+            discord.SelectOption(label="event", value="event", emoji="⚔️", description="Event erstellen"),
+            discord.SelectOption(label="event-edit", value="event-edit", emoji="✏️", description="Event bearbeiten"),
+            discord.SelectOption(label="event_info", value="event_info", emoji="ℹ️", description="Event Informationen"),
+            discord.SelectOption(label="crawler", value="crawler", emoji="🕷️", description="Crawler Event"),
+            discord.SelectOption(label="carrier", value="carrier", emoji="🚢", description="Carrier Event"),
+            # Voice Management
+            discord.SelectOption(label="lockvoice", value="lockvoice", emoji="🔒", description="Voice Channel sperren"),
+            discord.SelectOption(label="unlockvoice", value="unlockvoice", emoji="🔓", description="Voice Channel entsperren"),
+            discord.SelectOption(label="ragelock", value="ragelock", emoji="😡", description="Rage Lock"),
+            discord.SelectOption(label="moveall", value="moveall", emoji="↔️", description="Alle User bewegen"),
+            discord.SelectOption(label="voice_stats", value="voice_stats", emoji="📊", description="Voice Statistiken"),
+            # Temp Voice
+            discord.SelectOption(label="temp_voice", value="temp_voice", emoji="🔊", description="Temp Voice verwalten"),
+            discord.SelectOption(label="temp_limit", value="temp_limit", emoji="👥", description="Temp Voice Limit"),
+            discord.SelectOption(label="temp_name", value="temp_name", emoji="📝", description="Temp Voice Name"),
+            discord.SelectOption(label="temp_kick", value="temp_kick", emoji="👢", description="Temp Voice Kick"),
+            # Raid System
+            discord.SelectOption(label="createraid", value="createraid", emoji="🏜️", description="Raid erstellen"),
+            discord.SelectOption(label="anmelden", value="anmelden", emoji="✅", description="Raid Anmeldung"),
+            discord.SelectOption(label="raid_info", value="raid_info", emoji="📄", description="Raid Informationen"),
+            discord.SelectOption(label="spice_crawl", value="spice_crawl", emoji="🌶️", description="Spice Crawl"),
+            # ModMail
+            discord.SelectOption(label="modmail", value="modmail", emoji="📬", description="ModMail System"),
+            discord.SelectOption(label="reply", value="reply", emoji="💬", description="ModMail Antwort"),
+            discord.SelectOption(label="close", value="close", emoji="🚪", description="ModMail schließen"),
+        ]
+    )
+    async def command_select(self, interaction: discord.Interaction, select: discord.ui.Select):
+        command = select.values[0]
+        
+        # Zeige Rollen-Auswahl für den gewählten Command
+        view = RoleSelectionView(self.setup_cog, command)
+        
+        # Aktuelle Berechtigungen laden
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        current_permissions = config.get('command_permissions', {}).get(command, ["admin"])
+        
+        embed = discord.Embed(
+            title=f"🔐 Berechtigungen für `{command}`",
+            description=f"**Aktuell berechtigt:** {', '.join([r.title() for r in current_permissions])}\n\n"
+                       "Wähle die Rollen aus, die diesen Command verwenden dürfen:",
+            color=0x8E44AD
+        )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+class RoleSelectionView(discord.ui.View):
+    def __init__(self, setup_cog, command):
+        super().__init__(timeout=300)
+        self.setup_cog = setup_cog
+        self.command = command
+        
+        # Aktuelle Berechtigungen laden
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        current_permissions = config.get('command_permissions', {}).get(command, ["admin"])
+        
+        # Multi-Select für Rollen
+        self.role_select = discord.ui.Select(
+            placeholder="Wähle berechtigt Rollen aus (mehrere möglich)...",
+            min_values=1,
+            max_values=5,
+            options=[
+                discord.SelectOption(
+                    label="Admin", 
+                    value="admin", 
+                    emoji="👑", 
+                    description="Vollzugriff",
+                    default="admin" in current_permissions
+                ),
+                discord.SelectOption(
+                    label="Moderator", 
+                    value="moderator", 
+                    emoji="🛡️", 
+                    description="Moderation",
+                    default="moderator" in current_permissions
+                ),
+                discord.SelectOption(
+                    label="Raid Leader", 
+                    value="raid_leader", 
+                    emoji="⚔️", 
+                    description="Raid Management",
+                    default="raid_leader" in current_permissions
+                ),
+                discord.SelectOption(
+                    label="Member", 
+                    value="member", 
+                    emoji="🥈", 
+                    description="Vollmitglied",
+                    default="member" in current_permissions
+                ),
+                discord.SelectOption(
+                    label="Rekrut", 
+                    value="rekrut", 
+                    emoji="🥉", 
+                    description="Neues Mitglied",
+                    default="rekrut" in current_permissions
+                ),
+            ]
+        )
+        
+        self.role_select.callback = self.role_callback
+        self.add_item(self.role_select)
+    
+    async def role_callback(self, interaction: discord.Interaction):
+        """Handle role selection"""
+        selected_roles = self.role_select.values
+        
+        # Update config
+        await self.setup_cog.update_config(f'command_permissions.{self.command}', selected_roles)
+        
+        embed = discord.Embed(
+            title="✅ Berechtigungen aktualisiert",
+            description=f"**Command:** `{self.command}`\n"
+                       f"**Neue Berechtigungen:** {', '.join([r.title() for r in selected_roles])}\n\n"
+                       f"Diese Rollen können jetzt den `{self.command}` Command verwenden.",
+            color=0x4CAF50
+        )
+        
+        # Zeige auch Hierarchie-Info
+        hierarchy_info = {
+            "admin": "👑 Höchste Berechtigung",
+            "moderator": "🛡️ Moderation & Management", 
+            "raid_leader": "⚔️ Raid & Event Management",
+            "member": "🥈 Vollmitglied",
+            "rekrut": "🥉 Neue Mitglieder"
+        }
+        
+        role_descriptions = []
+        for role in selected_roles:
+            role_descriptions.append(f"• {hierarchy_info.get(role, role.title())}")
+        
+        embed.add_field(
+            name="📋 Berechtigte Rollen",
+            value="\n".join(role_descriptions),
+            inline=False
+        )
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 class CommandPermissionView(discord.ui.View):
     def __init__(self, setup_cog, category):
