@@ -11,13 +11,13 @@ from web_config import app
 if __name__ == '__main__':
     print("🌐 Starte Web-Interface für Bot-Konfiguration...")
     print("📍 URL: http://0.0.0.0:5000")
-    print("🔑 Standard-Passwort: admin123 (kann über ADMIN_PASSWORD Umgebungsvariable geändert werden)")
+    print("🔑 Standard-Passwort: admin (kann über ADMIN_PASSWORD Umgebungsvariable geändert werden)")
     print("🔐 Flask Secret Key kann über FLASK_SECRET_KEY Umgebungsvariable gesetzt werden")
     print("\n" + "="*50)
     
     # Setze Standard-Umgebungsvariablen falls nicht vorhanden
     if not os.environ.get('ADMIN_PASSWORD'):
-        os.environ['ADMIN_PASSWORD'] = 'admin123'
+        os.environ['ADMIN_PASSWORD'] = 'admin'
         print("⚠️  Verwende Standard-Passwort. Setze ADMIN_PASSWORD für Sicherheit!")
     
     if not os.environ.get('FLASK_SECRET_KEY'):
