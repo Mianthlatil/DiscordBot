@@ -35,17 +35,21 @@
                                     <div class="mb-2">
                                         <small class="text-muted">Berechtigte Rollen:</small>
                                     </div>
-                                    {% set current_roles = command_permissions.get(command, ['admin']) %}
-                                    {% for role in ['admin', 'moderator', 'raid_leader', 'member', 'rekrut'] %}
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="checkbox" name="roles" value="{{ role }}" 
-                                               id="{{ command }}_{{ role }}" 
-                                               {% if role in current_roles %}checked{% endif %}>
-                                        <label class="form-check-label" for="{{ command }}_{{ role }}">
-                                            {% if role == 'admin' %}👑{% elif role == 'moderator' %}🛡️{% elif role == 'raid_leader' %}⚔️{% elif role == 'member' %}🥈{% else %}🥉{% endif %}
-                                            {{ role.title() }}
-                                        </label>
-                                    </div>
+                                    {% set current_roles = command_permissions.get(command, []) %}
+                                    {% if custom_roles %}
+                                        {% for role_name, role_id in custom_roles.items() %}
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="checkbox" name="roles" value="{{ role_name }}" 
+                                                   id="{{ command }}_{{ role_name }}" 
+                                                   {% if role_name in current_roles %}checked{% endif %}>
+                                            <label class="form-check-label" for="{{ command }}_{{ role_name }}">
+                                                {{ role_name }}
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <p class="text-muted small">Keine Rollen konfiguriert. <a href="{{ url_for('roles') }}">Rollen einrichten</a></p>
+                                    {% endif %}
                                     {% endfor %}
                                     <div class="mt-2">
                                         <button type="submit" class="btn btn-primary btn-sm">

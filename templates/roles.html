@@ -6,7 +6,7 @@
 {% block content %}
 <div class="row">
     <div class="col-12">
-        <h1 class="mb-4"><i class="fas fa-users"></i> Rollen Konfiguration</h1>
+        <h1 class="mb-4"><i class="fas fa-users"></i> Discord Rollen Konfiguration</h1>
     </div>
 </div>
 
@@ -14,7 +14,7 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-header">
-                <h5><i class="fas fa-id-badge"></i> Discord Rollen zuweisen</h5>
+                <h5><i class="fas fa-id-badge"></i> Rollen für Bot-Funktionen zuweisen</h5>
                 <button id="refreshRoles" class="btn btn-sm btn-outline-primary">
                     <i class="fas fa-sync-alt"></i> Rollen aktualisieren
                 </button>
@@ -28,69 +28,16 @@
                 </div>
                 
                 <form method="POST" id="roleForm">
-                    <div class="mb-3">
-                        <label for="role_rekrut" class="form-label">🥉 Rekrut Rolle</label>
-                        <div class="input-group">
-                            <select class="form-select discord-role-select" data-target="role_rekrut">
-                                <option value="">Rolle auswählen...</option>
-                            </select>
-                            <input type="text" class="form-control" id="role_rekrut" name="role_rekrut" 
-                                   value="{{ config.roles.rekrut if config.roles else '' }}" 
-                                   placeholder="1234567890123456789" readonly>
-                        </div>
+                    <div id="roleContainer">
+                        <p class="text-muted">Lade Discord Rollen...</p>
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="role_member" class="form-label">🥈 Member Rolle</label>
-                        <div class="input-group">
-                            <select class="form-select discord-role-select" data-target="role_member">
-                                <option value="">Rolle auswählen...</option>
-                            </select>
-                            <input type="text" class="form-control" id="role_member" name="role_member" 
-                                   value="{{ config.roles.member if config.roles else '' }}" 
-                                   placeholder="1234567890123456789" readonly>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="role_moderator" class="form-label">🛡️ Moderator Rolle</label>
-                        <div class="input-group">
-                            <select class="form-select discord-role-select" data-target="role_moderator">
-                                <option value="">Rolle auswählen...</option>
-                            </select>
-                            <input type="text" class="form-control" id="role_moderator" name="role_moderator" 
-                                   value="{{ config.roles.moderator if config.roles else '' }}" 
-                                   placeholder="1234567890123456789" readonly>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="role_admin" class="form-label">👑 Admin Rolle</label>
-                        <div class="input-group">
-                            <select class="form-select discord-role-select" data-target="role_admin">
-                                <option value="">Rolle auswählen...</option>
-                            </select>
-                            <input type="text" class="form-control" id="role_admin" name="role_admin" 
-                                   value="{{ config.roles.admin if config.roles else '' }}" 
-                                   placeholder="1234567890123456789" readonly>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="role_raid_leader" class="form-label">⚔️ Raid Leader Rolle</label>
-                        <div class="input-group">
-                            <select class="form-select discord-role-select" data-target="role_raid_leader">
-                                <option value="">Rolle auswählen...</option>
-                            </select>
-                            <input type="text" class="form-control" id="role_raid_leader" name="role_raid_leader" 
-                                   value="{{ config.roles.raid_leader if config.roles else '' }}" 
-                                   placeholder="1234567890123456789" readonly>
-                        </div>
-                    </div>
-                    
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 mt-4">
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-save"></i> Speichern
+                        </button>
+                        <button type="button" id="addRole" class="btn btn-success">
+                            <i class="fas fa-plus"></i> Rolle hinzufügen
                         </button>
                         <a href="{{ url_for('index') }}" class="btn btn-secondary">
                             <i class="fas fa-arrow-left"></i> Zurück
@@ -110,14 +57,18 @@
                 <h6>So funktioniert es:</h6>
                 <ol class="small">
                     <li>Stelle sicher, dass der Bot online ist</li>
-                    <li>Wähle aus dem Dropdown die gewünschte Discord-Rolle</li>
-                    <li>Die Rollen-ID wird automatisch eingetragen</li>
+                    <li>Gib einen Namen für die Rolle ein</li>
+                    <li>Wähle die entsprechende Discord-Rolle aus</li>
                     <li>Klicke auf "Speichern"</li>
                 </ol>
                 
-                <h6 class="mt-3">Hierarchie:</h6>
+                <h6 class="mt-3">Beispiele:</h6>
                 <p class="small">
-                    👑 Admin > 🛡️ Moderator > ⚔️ Raid Leader > 🥈 Member > 🥉 Rekrut
+                    • Administrator<br>
+                    • Moderator<br>
+                    • Trusted Member<br>
+                    • VIP<br>
+                    • Staff
                 </p>
                 
                 <h6 class="mt-3">Status:</h6>
@@ -130,6 +81,9 @@
 </div>
 
 <script>
+let discordRoles = [];
+let roleCounter = 0;
+
 document.addEventListener('DOMContentLoaded', function() {
     loadDiscordRoles();
     
@@ -138,26 +92,15 @@ document.addEventListener('DOMContentLoaded', function() {
         loadDiscordRoles();
     });
     
-    // Role selection handlers
-    document.querySelectorAll('.discord-role-select').forEach(select => {
-        select.addEventListener('change', function() {
-            const targetId = this.getAttribute('data-target');
-            const targetInput = document.getElementById(targetId);
-            
-            if (this.value) {
-                targetInput.value = this.value;
-                targetInput.style.backgroundColor = '#e8f5e8';
-            } else {
-                targetInput.style.backgroundColor = '';
-            }
-        });
+    // Add role button
+    document.getElementById('addRole').addEventListener('click', function() {
+        addRoleRow();
     });
 });
 
 function loadDiscordRoles() {
     const loading = document.getElementById('loading');
     const status = document.getElementById('roleStatus');
-    const selects = document.querySelectorAll('.discord-role-select');
     
     loading.style.display = 'block';
     status.innerHTML = '<i class="fas fa-circle text-warning"></i> Lade Rollen...';
@@ -166,43 +109,18 @@ function loadDiscordRoles() {
         .then(response => response.json())
         .then(roles => {
             loading.style.display = 'none';
+            discordRoles = roles;
             
             if (roles.length === 0) {
                 status.innerHTML = '<i class="fas fa-circle text-danger"></i> Keine Rollen gefunden - Bot offline?';
+                document.getElementById('roleContainer').innerHTML = '<p class="text-danger">Bot ist offline oder keine Rollen gefunden.</p>';
                 return;
             }
             
             status.innerHTML = `<i class="fas fa-circle text-success"></i> ${roles.length} Rollen geladen`;
             
-            // Clear and populate all selects
-            selects.forEach(select => {
-                const currentValue = document.getElementById(select.getAttribute('data-target')).value;
-                
-                // Clear existing options except first
-                while (select.children.length > 1) {
-                    select.removeChild(select.lastChild);
-                }
-                
-                // Add roles
-                roles.forEach(role => {
-                    const option = document.createElement('option');
-                    option.value = role.id;
-                    option.textContent = role.name;
-                    
-                    // Set color if available
-                    if (role.color && role.color !== '#000000') {
-                        option.style.color = role.color;
-                    }
-                    
-                    // Select if this is the current value
-                    if (role.id == currentValue) {
-                        option.selected = true;
-                        select.style.backgroundColor = '#e8f5e8';
-                    }
-                    
-                    select.appendChild(option);
-                });
-            });
+            // Load existing roles from config
+            loadExistingRoles();
         })
         .catch(error => {
             console.error('Error loading roles:', error);
@@ -210,26 +128,111 @@ function loadDiscordRoles() {
             status.innerHTML = '<i class="fas fa-circle text-danger"></i> Fehler beim Laden';
         });
 }
+
+function loadExistingRoles() {
+    const container = document.getElementById('roleContainer');
+    container.innerHTML = '';
+    
+    // Load existing roles from config
+    fetch('/api/config')
+        .then(response => response.json())
+        .then(config => {
+            const existingRoles = config.custom_roles || {};
+            
+            if (Object.keys(existingRoles).length === 0) {
+                // Add first empty role row
+                addRoleRow();
+            } else {
+                // Add existing roles
+                Object.entries(existingRoles).forEach(([name, roleId]) => {
+                    addRoleRow(name, roleId);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error loading config:', error);
+            addRoleRow(); // Add at least one empty row
+        });
+}
+
+function addRoleRow(name = '', roleId = '') {
+    const container = document.getElementById('roleContainer');
+    const rowId = `role_${roleCounter++}`;
+    
+    const roleRow = document.createElement('div');
+    roleRow.className = 'row mb-3 role-row';
+    roleRow.id = rowId;
+    
+    roleRow.innerHTML = `
+        <div class="col-md-5">
+            <label class="form-label">Rollen-Name</label>
+            <input type="text" class="form-control role-name" name="role_names[]" 
+                   value="${name}" placeholder="z.B. Administrator">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Discord Rolle</label>
+            <select class="form-select discord-role-select" name="role_ids[]">
+                <option value="">Rolle auswählen...</option>
+                ${discordRoles.map(role => `
+                    <option value="${role.id}" ${role.id == roleId ? 'selected' : ''} 
+                            ${role.color && role.color !== '#000000' ? `style="color: ${role.color}"` : ''}>
+                        ${role.name}
+                    </option>
+                `).join('')}
+            </select>
+        </div>
+        <div class="col-md-1">
+            <label class="form-label">&nbsp;</label>
+            <button type="button" class="btn btn-outline-danger btn-sm d-block remove-role">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `;
+    
+    container.appendChild(roleRow);
+    
+    // Add remove functionality
+    roleRow.querySelector('.remove-role').addEventListener('click', function() {
+        roleRow.remove();
+    });
+    
+    // Add change event to highlight selected roles
+    roleRow.querySelector('.discord-role-select').addEventListener('change', function() {
+        if (this.value) {
+            this.style.backgroundColor = '#e8f5e8';
+        } else {
+            this.style.backgroundColor = '';
+        }
+    });
+    
+    // Set initial highlight
+    if (roleId) {
+        roleRow.querySelector('.discord-role-select').style.backgroundColor = '#e8f5e8';
+    }
+}
 </script>
 
 <style>
+.role-row {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    background-color: #f8f9fa;
+}
+
 .discord-role-select option {
     padding: 5px;
-}
-
-.input-group .form-select {
-    border-right: 0;
-}
-
-.input-group .form-control[readonly] {
-    background-color: #f8f9fa;
-    border-left: 0;
 }
 
 #roleStatus {
     padding: 8px;
     border-radius: 4px;
     background-color: #f8f9fa;
+}
+
+.remove-role {
+    margin-top: 32px;
 }
 </style>
 {% endblock %}

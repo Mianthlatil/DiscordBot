@@ -10,7 +10,7 @@ from web_config import app
 
 if __name__ == '__main__':
     print("🌐 Starte Web-Interface für Bot-Konfiguration...")
-    print("📍 URL: http://0.0.0.0:5000")
+    print("📍 URL: http://0.0.0.0:8080")
     print("🔑 Standard-Passwort: admin (kann über ADMIN_PASSWORD Umgebungsvariable geändert werden)")
     print("🔐 Flask Secret Key kann über FLASK_SECRET_KEY Umgebungsvariable gesetzt werden")
     print("\n" + "="*50)
@@ -24,4 +24,4 @@ if __name__ == '__main__':
         os.environ['FLASK_SECRET_KEY'] = 'your-secret-key-change-this-in-production'
         print("⚠️  Verwende Standard Secret Key. Setze FLASK_SECRET_KEY für Sicherheit!")
     
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=True)

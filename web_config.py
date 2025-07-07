@@ -119,16 +119,22 @@ def roles():
     config = load_config()
     
     if request.method == 'POST':
-        if 'roles' not in config:
-            config['roles'] = {}
+        role_names = request.form.getlist('role_names[]')
+        role_ids = request.form.getlist('role_ids[]')
         
-        for role_name in ['rekrut', 'member', 'moderator', 'admin', 'raid_leader']:
-            role_id = request.form.get(f'role_{role_name}')
-            if role_id:
+        if 'custom_roles' not in config:
+            config['custom_roles'] = {}
+        
+        # Clear existing custom roles
+        config['custom_roles'] = {}
+        
+        # Add new custom roles
+        for i, (name, role_id) in enumerate(zip(role_names, role_ids)):
+            if name.strip() and role_id:
                 try:
-                    config['roles'][role_name] = int(role_id)
+                    config['custom_roles'][name.strip()] = int(role_id)
                 except ValueError:
-                    flash(f'Ungültige ID für {role_name}!', 'error')
+                    flash(f'Ungültige ID für {name}!', 'error')
                     return render_template('roles.html', config=config)
         
         save_config(config)
@@ -179,11 +185,13 @@ def permissions():
     ]
     
     command_permissions = config.get('command_permissions', {})
+    custom_roles = config.get('custom_roles', {})
     
     return render_template('permissions.html', 
                          config=config, 
                          all_commands=all_commands,
-                         command_permissions=command_permissions)
+                         command_permissions=command_permissions,
+                         custom_roles=custom_roles)
 
 @app.route('/update_permission', methods=['POST'])
 @require_auth
@@ -194,12 +202,13 @@ def update_permission():
     command = request.form.get('command')
     selected_roles = request.form.getlist('roles')
     
-    if not command or not selected_roles:
-        return jsonify({'error': 'Command und Rollen sind erforderlich'}), 400
+    if not command:
+        return jsonify({'error': 'Command ist erforderlich'}), 400
     
     if 'command_permissions' not in config:
         config['command_permissions'] = {}
     
+    # Allow empty role list to remove all permissions
     config['command_permissions'][command] = selected_roles
     save_config(config)
     
