@@ -66,12 +66,21 @@
                         <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
                         <h5>Keine Server gefunden</h5>
                         <p class="text-muted">
-                            Der Bot ist auf keinen Discord Servern aktiv oder ist nicht online.
+                            Der Bot ist möglicherweise nicht online oder noch nicht bereit.<br>
+                            Überprüfe die Konsole für weitere Informationen.
                         </p>
                         <div class="mt-4">
                             <a href="javascript:location.reload()" class="btn btn-outline-primary">
                                 <i class="fas fa-sync-alt"></i> Aktualisieren
                             </a>
+                        </div>
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <strong>Mögliche Ursachen:</strong><br>
+                                • Bot ist noch nicht vollständig gestartet<br>
+                                • Bot ist nicht mit Discord verbunden<br>
+                                • Bot ist auf keinen Servern aktiv
+                            </small>
                         </div>
                     </div>
                 {% endif %}

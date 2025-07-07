@@ -33,28 +33,48 @@ def get_discord_guilds():
     try:
         # Try to get guilds from existing bot instance
         try:
+            import sys
+            import importlib
+            
+            # Reload main module to ensure we get the latest bot instance
+            if 'main' in sys.modules:
+                importlib.reload(sys.modules['main'])
+            
             import main
-            if hasattr(main, 'bot') and main.bot and main.bot.is_ready():
-                guilds = []
-                for guild in main.bot.guilds:
-                    guilds.append({
-                        'id': guild.id,
-                        'name': guild.name,
-                        'icon': str(guild.icon) if guild.icon else None,
-                        'member_count': guild.member_count
-                    })
-                print(f"Found {len(guilds)} guilds: {[g['name'] for g in guilds]}")
-                return guilds
+            
+            print(f"Bot instance available: {hasattr(main, 'bot')}")
+            if hasattr(main, 'bot') and main.bot:
+                print(f"Bot is ready: {main.bot.is_ready()}")
+                print(f"Bot user: {main.bot.user}")
+                
+                if main.bot.is_ready():
+                    guilds = []
+                    for guild in main.bot.guilds:
+                        guilds.append({
+                            'id': guild.id,
+                            'name': guild.name,
+                            'icon': str(guild.icon) if guild.icon else None,
+                            'member_count': guild.member_count
+                        })
+                    print(f"Found {len(guilds)} guilds: {[g['name'] for g in guilds]}")
+                    return guilds
+                else:
+                    print("Bot is not ready yet - waiting for connection...")
+                    return []
             else:
-                print("Bot is not ready or not available")
+                print("Bot instance not found or not available")
         except ImportError as e:
             print(f"Import error: {e}")
         except Exception as e:
             print(f"Bot access error: {e}")
+            import traceback
+            traceback.print_exc()
         
         return []
     except Exception as e:
         print(f"Error fetching Discord guilds: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 def get_discord_roles(guild_id=None):
@@ -69,7 +89,15 @@ def get_discord_roles(guild_id=None):
         
         # Try to get roles from existing bot instance
         try:
+            import sys
+            import importlib
+            
+            # Reload main module to ensure we get the latest bot instance
+            if 'main' in sys.modules:
+                importlib.reload(sys.modules['main'])
+            
             import main
+            
             if hasattr(main, 'bot') and main.bot and main.bot.is_ready():
                 guild = main.bot.get_guild(int(target_guild_id))
                 if guild:
@@ -85,10 +113,14 @@ def get_discord_roles(guild_id=None):
             print(f"Import error for roles: {e}")
         except Exception as e:
             print(f"Bot access error for roles: {e}")
+            import traceback
+            traceback.print_exc()
         
         return []
     except Exception as e:
         print(f"Error fetching Discord roles: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 def get_discord_channels(guild_id=None):
@@ -103,7 +135,15 @@ def get_discord_channels(guild_id=None):
         
         # Try to get channels from existing bot instance
         try:
+            import sys
+            import importlib
+            
+            # Reload main module to ensure we get the latest bot instance
+            if 'main' in sys.modules:
+                importlib.reload(sys.modules['main'])
+            
             import main
+            
             if hasattr(main, 'bot') and main.bot and main.bot.is_ready():
                 guild = main.bot.get_guild(int(target_guild_id))
                 if guild:
@@ -127,10 +167,14 @@ def get_discord_channels(guild_id=None):
             print(f"Import error for channels: {e}")
         except Exception as e:
             print(f"Bot access error for channels: {e}")
+            import traceback
+            traceback.print_exc()
         
         return []
     except Exception as e:
         print(f"Error fetching Discord channels: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 def require_auth(f):
