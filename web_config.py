@@ -150,36 +150,23 @@ def roles():
     config = load_config()
     
     if request.method == 'POST':
-        # Handle standard roles
-        standard_role_names = request.form.getlist('role_names[]')
-        standard_role_ids = request.form.getlist('role_ids[]')
-        
-        # Handle custom roles
-        custom_role_names = request.form.getlist('custom_role_names[]')
-        custom_role_ids = request.form.getlist('custom_role_ids[]')
+        # Handle Discord roles directly
+        role_names = request.form.getlist('role_names[]')
+        role_ids = request.form.getlist('role_ids[]')
         
         if 'roles' not in config:
             config['roles'] = {}
-        if 'custom_roles' not in config:
-            config['custom_roles'] = {}
         
-        # Update standard roles
-        for name, role_id in zip(standard_role_names, standard_role_ids):
+        # Clear existing roles
+        config['roles'] = {}
+        
+        # Update with selected Discord roles
+        for name, role_id in zip(role_names, role_ids):
             if name.strip() and role_id:
                 try:
                     config['roles'][name.strip()] = int(role_id)
                 except ValueError:
-                    flash(f'Ungültige ID für Standard-Rolle {name}!', 'error')
-                    return render_template('roles.html', config=config)
-        
-        # Clear and update custom roles
-        config['custom_roles'] = {}
-        for name, role_id in zip(custom_role_names, custom_role_ids):
-            if name.strip() and role_id:
-                try:
-                    config['custom_roles'][name.strip()] = int(role_id)
-                except ValueError:
-                    flash(f'Ungültige ID für Custom-Rolle {name}!', 'error')
+                    flash(f'Ungültige ID für Rolle {name}!', 'error')
                     return render_template('roles.html', config=config)
         
         save_config(config)
@@ -230,13 +217,13 @@ def permissions():
     ]
     
     command_permissions = config.get('command_permissions', {})
-    custom_roles = config.get('custom_roles', {})
+    configured_roles = config.get('roles', {})
     
     return render_template('permissions.html', 
                          config=config, 
                          all_commands=all_commands,
                          command_permissions=command_permissions,
-                         custom_roles=custom_roles)
+                         configured_roles=configured_roles)
 
 @app.route('/update_permission', methods=['POST'])
 @require_auth
@@ -337,4 +324,4 @@ def reset_permissions():
     return redirect(url_for('permissions'))
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=3000, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=True)
