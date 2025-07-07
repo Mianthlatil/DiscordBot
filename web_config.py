@@ -37,13 +37,16 @@ def get_discord_roles():
         if not guild_id:
             return []
         
-        # Try to get roles from existing bot instance or create temporary connection
-        import main
-        if hasattr(main, 'bot') and main.bot.is_ready():
-            guild = main.bot.get_guild(guild_id)
-            if guild:
-                return [{'id': role.id, 'name': role.name, 'color': str(role.color)} 
-                       for role in guild.roles if role.name != '@everyone']
+        # Try to get roles from existing bot instance
+        try:
+            import main
+            if hasattr(main, 'bot') and main.bot.is_ready():
+                guild = main.bot.get_guild(int(guild_id))
+                if guild:
+                    return [{'id': role.id, 'name': role.name, 'color': str(role.color)} 
+                           for role in guild.roles if role.name != '@everyone' and not role.managed]
+        except ImportError:
+            pass
         
         return []
     except Exception as e:
@@ -60,21 +63,24 @@ def get_discord_channels():
             return []
         
         # Try to get channels from existing bot instance
-        import main
-        if hasattr(main, 'bot') and main.bot.is_ready():
-            guild = main.bot.get_guild(guild_id)
-            if guild:
-                channels = []
-                for channel in guild.channels:
-                    if hasattr(channel, 'type'):
-                        channel_type = str(channel.type).replace('ChannelType.', '')
-                        channels.append({
-                            'id': channel.id, 
-                            'name': channel.name, 
-                            'type': channel_type,
-                            'category': channel.category.name if channel.category else None
-                        })
-                return channels
+        try:
+            import main
+            if hasattr(main, 'bot') and main.bot.is_ready():
+                guild = main.bot.get_guild(int(guild_id))
+                if guild:
+                    channels = []
+                    for channel in guild.channels:
+                        if hasattr(channel, 'type'):
+                            channel_type = str(channel.type).replace('ChannelType.', '')
+                            channels.append({
+                                'id': channel.id, 
+                                'name': channel.name, 
+                                'type': channel_type,
+                                'category': channel.category.name if channel.category else None
+                            })
+                    return channels
+        except ImportError:
+            pass
         
         return []
     except Exception as e:
@@ -324,4 +330,4 @@ def reset_permissions():
     return redirect(url_for('permissions'))
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)

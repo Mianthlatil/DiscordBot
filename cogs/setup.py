@@ -219,24 +219,23 @@ class RoleSetupView(discord.ui.View):
     @discord.ui.select(
         placeholder="Wähle eine Rolle zum Konfigurieren...",
         options=[
-            discord.SelectOption(label="Rekrut", value="rekrut", emoji="🥉"),
-            discord.SelectOption(label="Member", value="member", emoji="🥈"),
-            discord.SelectOption(label="Moderator", value="moderator", emoji="🛡️"),
-            discord.SelectOption(label="Admin", value="admin", emoji="👑"),
-            discord.SelectOption(label="Raid Leader", value="raid_leader", emoji="⚔️"),
+            discord.SelectOption(label="Benutzerdefinierte Rolle hinzufügen", value="custom_role", emoji="➕"),
         ]
     )
     async def role_select(self, interaction: discord.Interaction, select: discord.ui.Select):
-        role_name = select.values[0]
-        view = DiscordRoleSelectView(self.setup_cog, role_name, self.guild)
-        
-        embed = discord.Embed(
-            title=f"👥 {role_name.title()} Rolle auswählen",
-            description=f"Wähle die Discord-Rolle aus, die als **{role_name.title()}** verwendet werden soll:",
-            color=0xFF8C00
-        )
-        
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        if select.values[0] == "custom_role":
+            await interaction.response.send_modal(CustomRoleModal(self.setup_cog))
+        else:
+            role_name = select.values[0]
+            view = DiscordRoleSelectView(self.setup_cog, role_name, self.guild)
+            
+            embed = discord.Embed(
+                title=f"👥 {role_name.title()} Rolle auswählen",
+                description=f"Wähle die Discord-Rolle aus, die als **{role_name.title()}** verwendet werden soll:",
+                color=0xFF8C00
+            )
+            
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 class DiscordRoleSelectView(discord.ui.View):
     def __init__(self, setup_cog, role_name, guild):
@@ -280,6 +279,56 @@ class DiscordRoleSelectView(discord.ui.View):
         embed = discord.Embed(
             title="✅ Rolle konfiguriert",
             description=f"**{self.role_name.title()}** wurde auf {role.mention} gesetzt!",
+            color=0x4CAF50
+        )
+        await interaction.response.send_message(embed=embed)
+
+class CustomRoleModal(discord.ui.Modal):
+    def __init__(self, setup_cog):
+        super().__init__(title="Benutzerdefinierte Rolle hinzufügen")
+        self.setup_cog = setup_cog
+
+        self.role_name_input = discord.ui.TextInput(
+            label="Rollen-Name (z.B. vip, supporter)",
+            placeholder="vip",
+            required=True,
+            max_length=50
+        )
+        self.add_item(self.role_name_input)
+
+        self.role_id_input = discord.ui.TextInput(
+            label="Discord Rollen-ID oder erwähnen",
+            placeholder="@RolleName oder 123456789012345678",
+            required=True
+        )
+        self.add_item(self.role_id_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        role_name = self.role_name_input.value.strip().lower()
+        role_input = self.role_id_input.value.strip()
+        
+        # Try to extract role ID
+        role_id = None
+        if role_input.startswith('<@&') and role_input.endswith('>'):
+            role_id = int(role_input[3:-1])
+        else:
+            try:
+                role_id = int(role_input)
+            except ValueError:
+                await interaction.response.send_message("❌ Ungültige Rolle! Bitte erwähne die Rolle oder gib die ID ein.", ephemeral=True)
+                return
+
+        # Verify role exists
+        role = interaction.guild.get_role(role_id)
+        if not role:
+            await interaction.response.send_message("❌ Rolle nicht gefunden!", ephemeral=True)
+            return
+
+        await self.setup_cog.update_config(f'roles.{role_name}', role_id)
+        
+        embed = discord.Embed(
+            title="✅ Rolle konfiguriert",
+            description=f"**{role_name.title()}** wurde auf {role.mention} gesetzt!",
             color=0x4CAF50
         )
         await interaction.response.send_message(embed=embed)
@@ -684,48 +733,35 @@ class RoleSelectionView(discord.ui.View):
         
         current_permissions = config.get('command_permissions', {}).get(command, ["admin"])
         
+        # Get configured roles from config
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        configured_roles = config.get('roles', {})
+        
+        # Create role options from configured roles
+        role_options = []
+        for role_name, role_id in configured_roles.items():
+            role_options.append(discord.SelectOption(
+                label=role_name.title(),
+                value=role_name,
+                description=f"ID: {role_id}",
+                default=role_name in current_permissions
+            ))
+        
+        if not role_options:
+            role_options.append(discord.SelectOption(
+                label="Keine Rollen konfiguriert",
+                value="none",
+                description="Konfiguriere erst Rollen im Setup"
+            ))
+            
         # Multi-Select für Rollen
         self.role_select = discord.ui.Select(
             placeholder="Wähle berechtigt Rollen aus (mehrere möglich)...",
             min_values=1,
-            max_values=5,
-            options=[
-                discord.SelectOption(
-                    label="Admin", 
-                    value="admin", 
-                    emoji="👑", 
-                    description="Vollzugriff",
-                    default="admin" in current_permissions
-                ),
-                discord.SelectOption(
-                    label="Moderator", 
-                    value="moderator", 
-                    emoji="🛡️", 
-                    description="Moderation",
-                    default="moderator" in current_permissions
-                ),
-                discord.SelectOption(
-                    label="Raid Leader", 
-                    value="raid_leader", 
-                    emoji="⚔️", 
-                    description="Raid Management",
-                    default="raid_leader" in current_permissions
-                ),
-                discord.SelectOption(
-                    label="Member", 
-                    value="member", 
-                    emoji="🥈", 
-                    description="Vollmitglied",
-                    default="member" in current_permissions
-                ),
-                discord.SelectOption(
-                    label="Rekrut", 
-                    value="rekrut", 
-                    emoji="🥉", 
-                    description="Neues Mitglied",
-                    default="rekrut" in current_permissions
-                ),
-            ]
+            max_values=min(len(role_options), 25),
+            options=role_options[:25]  # Discord limit
         )
         
         self.role_select.callback = self.role_callback

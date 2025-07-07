@@ -36,7 +36,7 @@
                                         <small class="text-muted">Berechtigte Rollen:</small>
                                     </div>
                                     {% set current_roles = command_permissions.get(command, []) %}
-                                    {% if custom_roles %}
+                                    {% if configured_roles %}
                                         {% for role_name, role_id in configured_roles.items() %}
                                         <div class="form-check form-check-inline">
                                             <input class="form-check-input" type="checkbox" name="roles" value="{{ role_name }}" 
@@ -50,7 +50,6 @@
                                     {% else %}
                                         <p class="text-muted small">Keine Rollen konfiguriert. <a href="{{ url_for('roles') }}">Rollen einrichten</a></p>
                                     {% endif %}
-                                    {% endfor %}
                                     <div class="mt-2">
                                         <button type="submit" class="btn btn-primary btn-sm">
                                             <i class="fas fa-save"></i> Speichern
