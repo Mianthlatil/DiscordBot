@@ -34,7 +34,7 @@ def get_discord_guilds():
         # Try to get guilds from existing bot instance
         try:
             import main
-            if hasattr(main, 'bot') and main.bot.is_ready():
+            if hasattr(main, 'bot') and main.bot and main.bot.is_ready():
                 guilds = []
                 for guild in main.bot.guilds:
                     guilds.append({
@@ -43,9 +43,14 @@ def get_discord_guilds():
                         'icon': str(guild.icon) if guild.icon else None,
                         'member_count': guild.member_count
                     })
+                print(f"Found {len(guilds)} guilds: {[g['name'] for g in guilds]}")
                 return guilds
-        except ImportError:
-            pass
+            else:
+                print("Bot is not ready or not available")
+        except ImportError as e:
+            print(f"Import error: {e}")
+        except Exception as e:
+            print(f"Bot access error: {e}")
         
         return []
     except Exception as e:
@@ -59,18 +64,27 @@ def get_discord_roles(guild_id=None):
         target_guild_id = guild_id or session.get('selected_guild_id') or config.get('guild_id')
         
         if not target_guild_id:
+            print("No guild ID provided")
             return []
         
         # Try to get roles from existing bot instance
         try:
             import main
-            if hasattr(main, 'bot') and main.bot.is_ready():
+            if hasattr(main, 'bot') and main.bot and main.bot.is_ready():
                 guild = main.bot.get_guild(int(target_guild_id))
                 if guild:
-                    return [{'id': role.id, 'name': role.name, 'color': str(role.color)} 
+                    roles = [{'id': role.id, 'name': role.name, 'color': str(role.color)} 
                            for role in guild.roles if role.name != '@everyone' and not role.managed]
-        except ImportError:
-            pass
+                    print(f"Found {len(roles)} roles for guild {guild.name}")
+                    return roles
+                else:
+                    print(f"Guild with ID {target_guild_id} not found")
+            else:
+                print("Bot is not ready or not available for roles")
+        except ImportError as e:
+            print(f"Import error for roles: {e}")
+        except Exception as e:
+            print(f"Bot access error for roles: {e}")
         
         return []
     except Exception as e:
@@ -84,12 +98,13 @@ def get_discord_channels(guild_id=None):
         target_guild_id = guild_id or session.get('selected_guild_id') or config.get('guild_id')
         
         if not target_guild_id:
+            print("No guild ID provided for channels")
             return []
         
         # Try to get channels from existing bot instance
         try:
             import main
-            if hasattr(main, 'bot') and main.bot.is_ready():
+            if hasattr(main, 'bot') and main.bot and main.bot.is_ready():
                 guild = main.bot.get_guild(int(target_guild_id))
                 if guild:
                     channels = []
@@ -102,9 +117,16 @@ def get_discord_channels(guild_id=None):
                                 'type': channel_type,
                                 'category': channel.category.name if channel.category else None
                             })
+                    print(f"Found {len(channels)} channels for guild {guild.name}")
                     return channels
-        except ImportError:
-            pass
+                else:
+                    print(f"Guild with ID {target_guild_id} not found for channels")
+            else:
+                print("Bot is not ready or not available for channels")
+        except ImportError as e:
+            print(f"Import error for channels: {e}")
+        except Exception as e:
+            print(f"Bot access error for channels: {e}")
         
         return []
     except Exception as e:

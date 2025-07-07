@@ -18,6 +18,13 @@
             </div>
             <div class="card-body">
                 {% if guilds %}
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="location.reload()">
+                            <i class="fas fa-sync-alt"></i> Aktualisieren
+                        </button>
+                        <small class="text-muted ms-2">{{ guilds|length }} Server gefunden</small>
+                    </div>
+                    
                     <form method="POST" action="{{ url_for('select_guild') }}">
                         <div class="list-group">
                             {% for guild in guilds %}
