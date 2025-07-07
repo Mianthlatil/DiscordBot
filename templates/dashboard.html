@@ -8,47 +8,31 @@
     <div class="col-12 mb-4">
         <h1 class="mb-4"><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
         
-        <!-- Server Selection -->
+        <!-- Current Server Info -->
         <div class="card mb-4">
-            <div class="card-header">
-                <h5><i class="fas fa-server"></i> Discord Server Auswahl</h5>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-server"></i> Aktueller Discord Server</h5>
+                <a href="{{ url_for('change_guild') }}" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-exchange-alt"></i> Server wechseln
+                </a>
             </div>
             <div class="card-body">
-                {% if selected_guild %}
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="me-3">
-                            <i class="fas fa-server fa-2x text-primary"></i>
-                        </div>
-                        <div>
-                            <h6 class="mb-1">{{ selected_guild.name }}</h6>
-                            <small class="text-muted">{{ selected_guild.member_count }} Mitglieder</small>
-                        </div>
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        {% if selected_guild.icon %}
+                            <img src="https://cdn.discordapp.com/icons/{{ selected_guild.id }}/{{ selected_guild.icon }}.png" 
+                                 alt="{{ selected_guild.name }}" width="48" height="48" style="border-radius: 50%;">
+                        {% else %}
+                            <i class="fas fa-server fa-3x text-primary"></i>
+                        {% endif %}
                     </div>
-                {% else %}
-                    <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle"></i> Kein Server ausgewählt
+                    <div>
+                        <h5 class="mb-1">{{ selected_guild.name }}</h5>
+                        <p class="text-muted mb-0">
+                            <i class="fas fa-users"></i> {{ selected_guild.member_count }} Mitglieder
+                        </p>
                     </div>
-                {% endif %}
-                
-                <form method="POST" action="{{ url_for('select_guild') }}">
-                    <div class="row">
-                        <div class="col-md-8">
-                            <select name="guild_id" class="form-select" required>
-                                <option value="">Server auswählen...</option>
-                                {% for guild in guilds %}
-                                    <option value="{{ guild.id }}" {% if selected_guild_id == guild.id %}selected{% endif %}>
-                                        {{ guild.name }} ({{ guild.member_count }} Mitglieder)
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-check"></i> Auswählen
-                            </button>
-                        </div>
-                    </div>
-                </form>
+                </div>
             </div>
         </div>
     </div>

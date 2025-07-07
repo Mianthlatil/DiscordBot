@@ -1,0 +1,104 @@
+
+{% extends "base.html" %}
+
+{% block title %}Server Auswahl - Bot Konfiguration{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="text-center mb-5">
+            <i class="fas fa-server fa-5x text-primary mb-4"></i>
+            <h1 class="mb-3">Discord Server auswählen</h1>
+            <p class="text-muted">Wähle den Discord Server aus, den du verwalten möchtest.</p>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-list"></i> Verfügbare Server</h5>
+            </div>
+            <div class="card-body">
+                {% if guilds %}
+                    <form method="POST" action="{{ url_for('select_guild') }}">
+                        <div class="list-group">
+                            {% for guild in guilds %}
+                            <label class="list-group-item list-group-item-action" style="cursor: pointer;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center">
+                                        <input type="radio" name="guild_id" value="{{ guild.id }}" class="form-check-input me-3" required>
+                                        <div>
+                                            <div class="d-flex align-items-center">
+                                                {% if guild.icon %}
+                                                    <img src="https://cdn.discordapp.com/icons/{{ guild.id }}/{{ guild.icon }}.png" 
+                                                         alt="{{ guild.name }}" class="me-2" width="32" height="32" style="border-radius: 50%;">
+                                                {% else %}
+                                                    <i class="fas fa-server me-2 text-secondary"></i>
+                                                {% endif %}
+                                                <div>
+                                                    <h6 class="mb-0">{{ guild.name }}</h6>
+                                                    <small class="text-muted">{{ guild.member_count }} Mitglieder</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <i class="fas fa-chevron-right text-muted"></i>
+                                    </div>
+                                </div>
+                            </label>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-check"></i> Server auswählen
+                            </button>
+                        </div>
+                    </form>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                        <h5>Keine Server gefunden</h5>
+                        <p class="text-muted">
+                            Der Bot ist auf keinen Discord Servern aktiv oder ist nicht online.
+                        </p>
+                        <div class="mt-4">
+                            <a href="javascript:location.reload()" class="btn btn-outline-primary">
+                                <i class="fas fa-sync-alt"></i> Aktualisieren
+                            </a>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if guilds %}
+        <div class="card mt-4">
+            <div class="card-body">
+                <h6><i class="fas fa-info-circle"></i> Hinweise</h6>
+                <ul class="small mb-0">
+                    <li>Der Bot muss auf dem Server aktiv und online sein</li>
+                    <li>Du benötigst Administrator-Rechte auf dem Server</li>
+                    <li>Nach der Auswahl kannst du alle Bot-Einstellungen für diesen Server konfigurieren</li>
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.list-group-item:hover {
+    background-color: #f8f9fa;
+}
+
+.list-group-item input[type="radio"]:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.list-group-item:has(input[type="radio"]:checked) {
+    background-color: #e7f3ff;
+    border-color: #0d6efd;
+}
+</style>
+{% endblock %}

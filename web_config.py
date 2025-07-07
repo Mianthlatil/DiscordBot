@@ -120,6 +120,28 @@ def require_auth(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def require_guild_selection(f):
+    """Decorator to require guild selection before accessing settings"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'authenticated' not in session:
+            return redirect(url_for('login'))
+        
+        selected_guild_id = session.get('selected_guild_id')
+        if not selected_guild_id:
+            flash('Bitte wähle zuerst einen Discord Server aus!', 'warning')
+            return redirect(url_for('index'))
+        
+        # Verify guild still exists
+        guilds = get_discord_guilds()
+        if not any(g['id'] == int(selected_guild_id) for g in guilds):
+            session.pop('selected_guild_id', None)
+            flash('Der ausgewählte Server ist nicht mehr verfügbar!', 'error')
+            return redirect(url_for('index'))
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route('/')
 def index():
     """Main dashboard"""
@@ -128,12 +150,19 @@ def index():
     
     config = load_config()
     guilds = get_discord_guilds()
-    selected_guild_id = session.get('selected_guild_id') or config.get('guild_id')
+    selected_guild_id = session.get('selected_guild_id')
+    
+    # If no guild selected, show guild selection page
+    if not selected_guild_id:
+        return render_template('guild_selection.html', guilds=guilds)
     
     # Get selected guild info
-    selected_guild = None
-    if selected_guild_id:
-        selected_guild = next((g for g in guilds if g['id'] == int(selected_guild_id)), None)
+    selected_guild = next((g for g in guilds if g['id'] == int(selected_guild_id)), None)
+    
+    # If selected guild not found, reset selection
+    if not selected_guild:
+        session.pop('selected_guild_id', None)
+        return render_template('guild_selection.html', guilds=guilds)
     
     return render_template('dashboard.html', 
                          config=config, 
@@ -149,11 +178,24 @@ def select_guild():
     
     if guild_id:
         try:
-            session['selected_guild_id'] = int(guild_id)
-            flash('Discord Server ausgewählt!', 'success')
+            guilds = get_discord_guilds()
+            if any(g['id'] == int(guild_id) for g in guilds):
+                session['selected_guild_id'] = int(guild_id)
+                guild_name = next(g['name'] for g in guilds if g['id'] == int(guild_id))
+                flash(f'Discord Server "{guild_name}" ausgewählt!', 'success')
+            else:
+                flash('Server nicht gefunden!', 'error')
         except ValueError:
             flash('Ungültige Server ID!', 'error')
     
+    return redirect(url_for('index'))
+
+@app.route('/change_guild')
+@require_auth
+def change_guild():
+    """Change the selected guild"""
+    session.pop('selected_guild_id', None)
+    flash('Server-Auswahl zurückgesetzt. Bitte wähle einen neuen Server.', 'info')
     return redirect(url_for('index'))
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -179,7 +221,7 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route('/basic_settings', methods=['GET', 'POST'])
-@require_auth
+@require_guild_selection
 def basic_settings():
     """Basic bot settings"""
     config = load_config()
@@ -201,7 +243,7 @@ def basic_settings():
     return render_template('basic_settings.html', config=config)
 
 @app.route('/roles', methods=['GET', 'POST'])
-@require_auth
+@require_guild_selection
 def roles():
     """Role configuration"""
     config = load_config()
@@ -233,7 +275,7 @@ def roles():
     return render_template('roles.html', config=config)
 
 @app.route('/channels', methods=['GET', 'POST'])
-@require_auth
+@require_guild_selection
 def channels():
     """Channel configuration"""
     config = load_config()
@@ -258,7 +300,7 @@ def channels():
     return render_template('channels.html', config=config)
 
 @app.route('/permissions')
-@require_auth
+@require_guild_selection
 def permissions():
     """Command permissions overview"""
     config = load_config()
@@ -283,7 +325,7 @@ def permissions():
                          configured_roles=configured_roles)
 
 @app.route('/update_permission', methods=['POST'])
-@require_auth
+@require_guild_selection
 def update_permission():
     """Update individual command permission"""
     config = load_config()
@@ -304,7 +346,7 @@ def update_permission():
     return jsonify({'success': True, 'message': f'Berechtigungen für {command} aktualisiert'})
 
 @app.route('/voice_promotion', methods=['GET', 'POST'])
-@require_auth
+@require_guild_selection
 def voice_promotion():
     """Voice promotion settings"""
     config = load_config()
@@ -327,7 +369,7 @@ def voice_promotion():
     return render_template('voice_promotion.html', config=config)
 
 @app.route('/temp_voice', methods=['GET', 'POST'])
-@require_auth
+@require_guild_selection
 def temp_voice():
     """Temporary voice settings"""
     config = load_config()
@@ -380,7 +422,7 @@ def api_discord_guilds():
     return jsonify(guilds)
 
 @app.route('/reset_permissions', methods=['POST'])
-@require_auth
+@require_guild_selection
 def reset_permissions():
     """Reset all command permissions"""
     config = load_config()
