@@ -200,11 +200,30 @@ class Setup(commands.Cog):
     async def setup_permissions(self, interaction):
         """Setup command permissions"""
         view = PermissionSetupView(self)
+        
+        # Load configured roles
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        configured_roles = config.get('roles', {})
+        
+        if configured_roles:
+            role_list = []
+            for role_name, role_id in configured_roles.items():
+                role = interaction.guild.get_role(role_id)
+                if role:
+                    role_list.append(f"• {role.name}")
+                else:
+                    role_list.append(f"• {role_name} (Rolle nicht gefunden)")
+            
+            roles_text = "\n".join(role_list)
+        else:
+            roles_text = "Keine Rollen konfiguriert - verwende `/setup component:Rollen` um Rollen einzurichten"
+        
         embed = discord.Embed(
             title="🔐 Command Berechtigungen Setup",
             description="Konfiguriere welche Rollen welche Befehle verwenden können:\n\n"
-                       "**Standard Hierarchie:**\n"
-                       "👑 Admin > 🛡️ Moderator > ⚔️ Raid Leader > 🥈 Member > 🥉 Rekrut\n\n"
+                       f"**Konfigurierte Rollen:**\n{roles_text}\n\n"
                        "**Wähle eine Option:**",
             color=0x8E44AD
         )
@@ -774,30 +793,35 @@ class RoleSelectionView(discord.ui.View):
         # Update config
         await self.setup_cog.update_config(f'command_permissions.{self.command}', selected_roles)
         
+        # Get configured roles to show Discord role names
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        configured_roles = config.get('roles', {})
+        
+        role_mentions = []
+        for role_name in selected_roles:
+            role_id = configured_roles.get(role_name)
+            if role_id:
+                role = interaction.guild.get_role(role_id)
+                if role:
+                    role_mentions.append(role.name)
+                else:
+                    role_mentions.append(f"{role_name} (nicht gefunden)")
+            else:
+                role_mentions.append(role_name)
+        
         embed = discord.Embed(
             title="✅ Berechtigungen aktualisiert",
             description=f"**Command:** `{self.command}`\n"
-                       f"**Neue Berechtigungen:** {', '.join([r.title() for r in selected_roles])}\n\n"
+                       f"**Neue Berechtigungen:** {', '.join(role_mentions)}\n\n"
                        f"Diese Rollen können jetzt den `{self.command}` Command verwenden.",
             color=0x4CAF50
         )
         
-        # Zeige auch Hierarchie-Info
-        hierarchy_info = {
-            "admin": "👑 Höchste Berechtigung",
-            "moderator": "🛡️ Moderation & Management", 
-            "raid_leader": "⚔️ Raid & Event Management",
-            "member": "🥈 Vollmitglied",
-            "rekrut": "🥉 Neue Mitglieder"
-        }
-        
-        role_descriptions = []
-        for role in selected_roles:
-            role_descriptions.append(f"• {hierarchy_info.get(role, role.title())}")
-        
         embed.add_field(
             name="📋 Berechtigte Rollen",
-            value="\n".join(role_descriptions),
+            value="\n".join([f"• {role}" for role in role_mentions]),
             inline=False
         )
         
