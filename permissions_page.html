@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Command-Berechtigungen</title>
+</head>
+<body>
+    <h1>Command-Permissions für {{ guild.name }}</h1>
+    <form method="post" action="/save_permissions">
+        <input type="hidden" name="guild_id" value="{{ guild.id }}">
+
+        {% for command in commands %}
+        <fieldset>
+            <legend>{{ command }}</legend>
+            <label>
+                <input type="radio" name="mode_{{ command }}" value="whitelist" checked>
+                Nur ausgewählte Rollen dürfen den Command nutzen (Whitelist)
+            </label><br>
+            <label>
+                <input type="radio" name="mode_{{ command }}" value="blacklist">
+                Alle dürfen den Command nutzen, außer ausgewählte Rollen (Blacklist)
+            </label><br><br>
+
+            {% for role in roles %}
+                <label>
+                    <input type="checkbox" name="roles_{{ command }}" value="{{ role.id }}"> {{ role.name }}
+                </label><br>
+            {% endfor %}
+        </fieldset>
+        <br>
+        {% endfor %}
+
+        <button type="submit">Speichern</button>
+    </form>
+</body>
+</html>
