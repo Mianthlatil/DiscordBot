@@ -21,45 +21,5 @@
         "default_name": "{user}'s Channel",
         "default_limit": 100
     },
-    "command_permissions": {
-        "balance": [
-            "admin",
-            "moderator",
-            "raid_leader",
-            "member",
-            "rekrut"
-        ],
-        "leaderboard": [
-            "admin",
-            "moderator",
-            "raid_leader",
-            "member",
-            "rekrut"
-        ],
-        "give": [
-            "admin",
-            "moderator",
-            "raid_leader"
-        ],
-        "take": [
-            "admin",
-            "moderator",
-            "raid_leader"
-        ],
-        "moveall": [
-            "admin",
-            "moderator"
-        ],
-        "temp_voice": [
-            "admin",
-            "moderator"
-        ],
-        "modmail": [
-            "admin",
-            "rekrut",
-            "member",
-            "raid_leader",
-            "moderator"
-        ]
-    }
+    "command_permissions": {}
 }
