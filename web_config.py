@@ -28,20 +28,44 @@ def save_config(config):
     with open('config.json', 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=4, ensure_ascii=False)
 
-def get_discord_roles():
+def get_discord_guilds():
+    """Get all Discord guilds the bot is connected to"""
+    try:
+        # Try to get guilds from existing bot instance
+        try:
+            import main
+            if hasattr(main, 'bot') and main.bot.is_ready():
+                guilds = []
+                for guild in main.bot.guilds:
+                    guilds.append({
+                        'id': guild.id,
+                        'name': guild.name,
+                        'icon': str(guild.icon) if guild.icon else None,
+                        'member_count': guild.member_count
+                    })
+                return guilds
+        except ImportError:
+            pass
+        
+        return []
+    except Exception as e:
+        print(f"Error fetching Discord guilds: {e}")
+        return []
+
+def get_discord_roles(guild_id=None):
     """Get Discord roles from the bot instance"""
     try:
         config = load_config()
-        guild_id = config.get('guild_id')
+        target_guild_id = guild_id or session.get('selected_guild_id') or config.get('guild_id')
         
-        if not guild_id:
+        if not target_guild_id:
             return []
         
         # Try to get roles from existing bot instance
         try:
             import main
             if hasattr(main, 'bot') and main.bot.is_ready():
-                guild = main.bot.get_guild(int(guild_id))
+                guild = main.bot.get_guild(int(target_guild_id))
                 if guild:
                     return [{'id': role.id, 'name': role.name, 'color': str(role.color)} 
                            for role in guild.roles if role.name != '@everyone' and not role.managed]
@@ -53,20 +77,20 @@ def get_discord_roles():
         print(f"Error fetching Discord roles: {e}")
         return []
 
-def get_discord_channels():
+def get_discord_channels(guild_id=None):
     """Get Discord channels from the bot instance"""
     try:
         config = load_config()
-        guild_id = config.get('guild_id')
+        target_guild_id = guild_id or session.get('selected_guild_id') or config.get('guild_id')
         
-        if not guild_id:
+        if not target_guild_id:
             return []
         
         # Try to get channels from existing bot instance
         try:
             import main
             if hasattr(main, 'bot') and main.bot.is_ready():
-                guild = main.bot.get_guild(int(guild_id))
+                guild = main.bot.get_guild(int(target_guild_id))
                 if guild:
                     channels = []
                     for channel in guild.channels:
@@ -103,7 +127,34 @@ def index():
         return redirect(url_for('login'))
     
     config = load_config()
-    return render_template('dashboard.html', config=config)
+    guilds = get_discord_guilds()
+    selected_guild_id = session.get('selected_guild_id') or config.get('guild_id')
+    
+    # Get selected guild info
+    selected_guild = None
+    if selected_guild_id:
+        selected_guild = next((g for g in guilds if g['id'] == int(selected_guild_id)), None)
+    
+    return render_template('dashboard.html', 
+                         config=config, 
+                         guilds=guilds,
+                         selected_guild=selected_guild,
+                         selected_guild_id=selected_guild_id)
+
+@app.route('/select_guild', methods=['POST'])
+@require_auth
+def select_guild():
+    """Select a Discord guild to manage"""
+    guild_id = request.form.get('guild_id')
+    
+    if guild_id:
+        try:
+            session['selected_guild_id'] = int(guild_id)
+            flash('Discord Server ausgewählt!', 'success')
+        except ValueError:
+            flash('Ungültige Server ID!', 'error')
+    
+    return redirect(url_for('index'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -309,15 +360,24 @@ def api_config():
 @require_auth
 def api_discord_roles():
     """API endpoint to get Discord roles"""
-    roles = get_discord_roles()
+    guild_id = request.args.get('guild_id')
+    roles = get_discord_roles(guild_id)
     return jsonify(roles)
 
 @app.route('/api/discord_channels')
 @require_auth
 def api_discord_channels():
     """API endpoint to get Discord channels"""
-    channels = get_discord_channels()
+    guild_id = request.args.get('guild_id')
+    channels = get_discord_channels(guild_id)
     return jsonify(channels)
+
+@app.route('/api/discord_guilds')
+@require_auth
+def api_discord_guilds():
+    """API endpoint to get Discord guilds"""
+    guilds = get_discord_guilds()
+    return jsonify(guilds)
 
 @app.route('/reset_permissions', methods=['POST'])
 @require_auth

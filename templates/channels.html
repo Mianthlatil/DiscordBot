@@ -106,14 +106,18 @@ function loadDiscordChannels() {
     loading.style.display = 'block';
     status.innerHTML = '<i class="fas fa-circle text-warning"></i> Lade Kanäle...';
     
-    fetch('/api/discord_channels')
+    // Get selected guild ID from URL or session
+    const urlParams = new URLSearchParams(window.location.search);
+    const guildId = urlParams.get('guild_id') || '';
+    
+    fetch(`/api/discord_channels?guild_id=${guildId}`)
         .then(response => response.json())
         .then(channels => {
             loading.style.display = 'none';
             discordChannels = channels;
             
             if (channels.length === 0) {
-                status.innerHTML = '<i class="fas fa-circle text-danger"></i> Keine Kanäle gefunden - Bot offline?';
+                status.innerHTML = '<i class="fas fa-circle text-danger"></i> Keine Kanäle gefunden - Server ausgewählt?';
                 return;
             }
             

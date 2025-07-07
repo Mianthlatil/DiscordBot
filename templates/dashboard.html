@@ -5,8 +5,52 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-12">
+    <div class="col-12 mb-4">
         <h1 class="mb-4"><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
+        
+        <!-- Server Selection -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="fas fa-server"></i> Discord Server Auswahl</h5>
+            </div>
+            <div class="card-body">
+                {% if selected_guild %}
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="me-3">
+                            <i class="fas fa-server fa-2x text-primary"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-1">{{ selected_guild.name }}</h6>
+                            <small class="text-muted">{{ selected_guild.member_count }} Mitglieder</small>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> Kein Server ausgewählt
+                    </div>
+                {% endif %}
+                
+                <form method="POST" action="{{ url_for('select_guild') }}">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <select name="guild_id" class="form-select" required>
+                                <option value="">Server auswählen...</option>
+                                {% for guild in guilds %}
+                                    <option value="{{ guild.id }}" {% if selected_guild_id == guild.id %}selected{% endif %}>
+                                        {{ guild.name }} ({{ guild.member_count }} Mitglieder)
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-check"></i> Auswählen
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 
