@@ -50,6 +50,37 @@ def get_discord_roles():
         print(f"Error fetching Discord roles: {e}")
         return []
 
+def get_discord_channels():
+    """Get Discord channels from the bot instance"""
+    try:
+        config = load_config()
+        guild_id = config.get('guild_id')
+        
+        if not guild_id:
+            return []
+        
+        # Try to get channels from existing bot instance
+        import main
+        if hasattr(main, 'bot') and main.bot.is_ready():
+            guild = main.bot.get_guild(guild_id)
+            if guild:
+                channels = []
+                for channel in guild.channels:
+                    if hasattr(channel, 'type'):
+                        channel_type = str(channel.type).replace('ChannelType.', '')
+                        channels.append({
+                            'id': channel.id, 
+                            'name': channel.name, 
+                            'type': channel_type,
+                            'category': channel.category.name if channel.category else None
+                        })
+                return channels
+        
+        return []
+    except Exception as e:
+        print(f"Error fetching Discord channels: {e}")
+        return []
+
 def require_auth(f):
     """Decorator to require authentication"""
     @wraps(f)
@@ -119,22 +150,36 @@ def roles():
     config = load_config()
     
     if request.method == 'POST':
-        role_names = request.form.getlist('role_names[]')
-        role_ids = request.form.getlist('role_ids[]')
+        # Handle standard roles
+        standard_role_names = request.form.getlist('role_names[]')
+        standard_role_ids = request.form.getlist('role_ids[]')
         
+        # Handle custom roles
+        custom_role_names = request.form.getlist('custom_role_names[]')
+        custom_role_ids = request.form.getlist('custom_role_ids[]')
+        
+        if 'roles' not in config:
+            config['roles'] = {}
         if 'custom_roles' not in config:
             config['custom_roles'] = {}
         
-        # Clear existing custom roles
-        config['custom_roles'] = {}
+        # Update standard roles
+        for name, role_id in zip(standard_role_names, standard_role_ids):
+            if name.strip() and role_id:
+                try:
+                    config['roles'][name.strip()] = int(role_id)
+                except ValueError:
+                    flash(f'Ungültige ID für Standard-Rolle {name}!', 'error')
+                    return render_template('roles.html', config=config)
         
-        # Add new custom roles
-        for i, (name, role_id) in enumerate(zip(role_names, role_ids)):
+        # Clear and update custom roles
+        config['custom_roles'] = {}
+        for name, role_id in zip(custom_role_names, custom_role_ids):
             if name.strip() and role_id:
                 try:
                     config['custom_roles'][name.strip()] = int(role_id)
                 except ValueError:
-                    flash(f'Ungültige ID für {name}!', 'error')
+                    flash(f'Ungültige ID für Custom-Rolle {name}!', 'error')
                     return render_template('roles.html', config=config)
         
         save_config(config)
@@ -274,6 +319,13 @@ def api_discord_roles():
     roles = get_discord_roles()
     return jsonify(roles)
 
+@app.route('/api/discord_channels')
+@require_auth
+def api_discord_channels():
+    """API endpoint to get Discord channels"""
+    channels = get_discord_channels()
+    return jsonify(channels)
+
 @app.route('/reset_permissions', methods=['POST'])
 @require_auth
 def reset_permissions():
@@ -285,4 +337,4 @@ def reset_permissions():
     return redirect(url_for('permissions'))
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=3000, debug=True)

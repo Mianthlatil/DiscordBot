@@ -62,13 +62,13 @@
                     <li>Klicke auf "Speichern"</li>
                 </ol>
                 
-                <h6 class="mt-3">Beispiele:</h6>
+                <h6 class="mt-3">Standard Rollen:</h6>
                 <p class="small">
-                    • Administrator<br>
-                    • Moderator<br>
-                    • Trusted Member<br>
-                    • VIP<br>
-                    • Staff
+                    • admin - Vollzugriff<br>
+                    • moderator - Moderation<br>
+                    • raid_leader - Raid Management<br>
+                    • member - Vollmitglied<br>
+                    • rekrut - Neue Mitglieder
                 </p>
                 
                 <h6 class="mt-3">Status:</h6>
@@ -137,16 +137,26 @@ function loadExistingRoles() {
     fetch('/api/config')
         .then(response => response.json())
         .then(config => {
-            const existingRoles = config.custom_roles || {};
+            const existingRoles = config.roles || {};
             
-            if (Object.keys(existingRoles).length === 0) {
-                // Add first empty role row
+            // Add standard roles if they exist
+            const standardRoles = ['admin', 'moderator', 'raid_leader', 'member', 'rekrut'];
+            standardRoles.forEach(role => {
+                const roleId = existingRoles[role] || '';
+                addRoleRow(role, roleId, true);
+            });
+            
+            // Add custom roles
+            const customRoles = config.custom_roles || {};
+            Object.entries(customRoles).forEach(([name, roleId]) => {
+                if (!standardRoles.includes(name)) {
+                    addRoleRow(name, roleId, false);
+                }
+            });
+            
+            // Add one empty row for new roles
+            if (Object.keys(customRoles).length === 0) {
                 addRoleRow();
-            } else {
-                // Add existing roles
-                Object.entries(existingRoles).forEach(([name, roleId]) => {
-                    addRoleRow(name, roleId);
-                });
             }
         })
         .catch(error => {
@@ -155,7 +165,7 @@ function loadExistingRoles() {
         });
 }
 
-function addRoleRow(name = '', roleId = '') {
+function addRoleRow(name = '', roleId = '', isStandard = false) {
     const container = document.getElementById('roleContainer');
     const rowId = `role_${roleCounter++}`;
     
@@ -163,15 +173,19 @@ function addRoleRow(name = '', roleId = '') {
     roleRow.className = 'row mb-3 role-row';
     roleRow.id = rowId;
     
+    const inputName = isStandard ? 'role_ids[]' : 'custom_role_ids[]';
+    const hiddenInput = isStandard ? `<input type="hidden" name="role_names[]" value="${name}">` : '';
+    
     roleRow.innerHTML = `
         <div class="col-md-5">
-            <label class="form-label">Rollen-Name</label>
-            <input type="text" class="form-control role-name" name="role_names[]" 
+            <label class="form-label">Rollen-Name ${isStandard ? '<span class="badge bg-primary">Standard</span>' : ''}</label>
+            <input type="text" class="form-control role-name" ${isStandard ? 'readonly' : 'name="custom_role_names[]"'} 
                    value="${name}" placeholder="z.B. Administrator">
+            ${hiddenInput}
         </div>
         <div class="col-md-6">
             <label class="form-label">Discord Rolle</label>
-            <select class="form-select discord-role-select" name="role_ids[]">
+            <select class="form-select discord-role-select" name="${inputName}">
                 <option value="">Rolle auswählen...</option>
                 ${discordRoles.map(role => `
                     <option value="${role.id}" ${role.id == roleId ? 'selected' : ''} 
@@ -183,18 +197,23 @@ function addRoleRow(name = '', roleId = '') {
         </div>
         <div class="col-md-1">
             <label class="form-label">&nbsp;</label>
-            <button type="button" class="btn btn-outline-danger btn-sm d-block remove-role">
+            ${!isStandard ? `<button type="button" class="btn btn-outline-danger btn-sm d-block remove-role">
                 <i class="fas fa-trash"></i>
-            </button>
+            </button>` : '<div class="btn btn-sm disabled">Standard</div>'}
         </div>
     `;
     
     container.appendChild(roleRow);
     
-    // Add remove functionality
-    roleRow.querySelector('.remove-role').addEventListener('click', function() {
-        roleRow.remove();
-    });
+    // Add remove functionality for custom roles only
+    if (!isStandard) {
+        const removeBtn = roleRow.querySelector('.remove-role');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', function() {
+                roleRow.remove();
+            });
+        }
+    }
     
     // Add change event to highlight selected roles
     roleRow.querySelector('.discord-role-select').addEventListener('change', function() {
@@ -233,6 +252,11 @@ function addRoleRow(name = '', roleId = '') {
 
 .remove-role {
     margin-top: 32px;
+}
+
+.role-row input[readonly] {
+    background-color: #e9ecef;
+    opacity: 1;
 }
 </style>
 {% endblock %}

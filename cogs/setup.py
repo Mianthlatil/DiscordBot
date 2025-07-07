@@ -159,10 +159,10 @@ class Setup(commands.Cog):
 
     async def setup_roles(self, interaction):
         """Setup roles with dropdown"""
-        view = RoleSetupView(self)
+        view = RoleSetupView(self, interaction.guild)
         embed = discord.Embed(
             title="👥 Rollen-Setup",
-            description="Wähle eine Rolle aus dem Dropdown-Menü aus und erwähne dann die entsprechende Discord-Rolle:",
+            description="Wähle eine Rolle aus dem Dropdown-Menü aus und dann die entsprechende Discord-Rolle:",
             color=0xFF8C00
         )
         await interaction.response.send_message(embed=embed, view=view)
@@ -211,9 +211,10 @@ class Setup(commands.Cog):
         await interaction.response.send_message(embed=embed, view=view)
 
 class RoleSetupView(discord.ui.View):
-    def __init__(self, setup_cog):
+    def __init__(self, setup_cog, guild):
         super().__init__(timeout=300)
         self.setup_cog = setup_cog
+        self.guild = guild
 
     @discord.ui.select(
         placeholder="Wähle eine Rolle zum Konfigurieren...",
@@ -227,7 +228,61 @@ class RoleSetupView(discord.ui.View):
     )
     async def role_select(self, interaction: discord.Interaction, select: discord.ui.Select):
         role_name = select.values[0]
-        await interaction.response.send_modal(RoleModal(self.setup_cog, role_name))
+        view = DiscordRoleSelectView(self.setup_cog, role_name, self.guild)
+        
+        embed = discord.Embed(
+            title=f"👥 {role_name.title()} Rolle auswählen",
+            description=f"Wähle die Discord-Rolle aus, die als **{role_name.title()}** verwendet werden soll:",
+            color=0xFF8C00
+        )
+        
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+class DiscordRoleSelectView(discord.ui.View):
+    def __init__(self, setup_cog, role_name, guild):
+        super().__init__(timeout=300)
+        self.setup_cog = setup_cog
+        self.role_name = role_name
+        self.guild = guild
+        
+        # Get guild roles and create options
+        role_options = []
+        for role in guild.roles:
+            if role.name != '@everyone' and not role.managed:
+                role_options.append(discord.SelectOption(
+                    label=role.name,
+                    value=str(role.id),
+                    description=f"ID: {role.id}"
+                ))
+        
+        # Limit to 25 options (Discord limit)
+        if len(role_options) > 25:
+            role_options = role_options[:25]
+        
+        if role_options:
+            self.role_select = discord.ui.Select(
+                placeholder="Discord-Rolle auswählen...",
+                options=role_options
+            )
+            self.role_select.callback = self.on_role_select
+            self.add_item(self.role_select)
+    
+    async def on_role_select(self, interaction: discord.Interaction):
+        role_id = int(self.role_select.values[0])
+        role = self.guild.get_role(role_id)
+        
+        if not role:
+            await interaction.response.send_message("❌ Rolle nicht gefunden!", ephemeral=True)
+            return
+        
+        await self.setup_cog.update_config(f'roles.{self.role_name}', role_id)
+        
+        embed = discord.Embed(
+            title="✅ Rolle konfiguriert",
+            description=f"**{self.role_name.title()}** wurde auf {role.mention} gesetzt!",
+            color=0x4CAF50
+        )
+        await interaction.response.send_message(embed=embed)
 
 class RoleModal(discord.ui.Modal):
     def __init__(self, setup_cog, role_name):
